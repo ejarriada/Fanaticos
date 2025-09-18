@@ -1,0 +1,39 @@
+services:
+  backend:
+    build: ./sistema_fanaticos_backend
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=your_secret_key_here # CHANGE THIS IN PRODUCTION
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+      - DATABASE_URL=sqlite:///db.sqlite3 # Use a proper database in production
+
+  frontend_comercializadora:
+    build: ./frontend_comercializadora
+    command: /bin/sh -c "npm install && npm start"
+    volumes:
+      - ./frontend_comercializadora:/app
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
+    environment:
+      - WDS_SOCKET_PORT=3000
+      - WDS_SOCKET_HOST=0.0.0.0
+
+  frontend_manufacturera:
+    build: ./frontend_manufacturera
+    command: /bin/sh -c "npm install && npm start"
+    volumes:
+      - ./frontend_manufacturera:/app
+    ports:
+      - "3002:3000"
+    depends_on:
+      - backend
+    environment:
+      - WDS_SOCKET_PORT=3002
+      - WDS_SOCKET_HOST=0.0.0.0

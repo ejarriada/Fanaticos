@@ -1,0 +1,653 @@
+﻿Datos e interacciones (Frontend Manufacturera)
+
+
+Módulo Gestión de Proveedores
+* Lista de Proveedores (verProveedores/Modificar, Eliminar)
+   * Proveedor (Listar)
+      * Nombre (Mostrar)
+      * Dirección (Mostrar)
+      * Teléfono (Mostrar)
+      * Categoría (Mostrar)
+      * CUIT (Mostrar)
+      * CBU (Mostrar)
+   * Compras (Lista)
+      * Detalle, Monto, Pagado, Factura, Usuario, Fecha
+   * Cuenta Corriente (Lista)
+      * Tipo, Detalle, Caja, Monto, Balance, Fecha
+      * Borrar Movimiento (Botón)
+   * Insumos (Listar)
+* Nuevo Proveedor 
+   * Nombre
+   * Información del Contacto
+   * CUIT/CUIL
+   * Teléfono
+   * Categoría (Listar)(?)
+   * CBU
+   * Sucursal
+   * Dirección
+   * email
+   * Rubro (Listar)
+   * Condición IVA (Listar: )
+   * Banco (Listar)
+   * Número de Cuenta
+   * Envío a Domicilio (tilde-boolean)
+   * Agregar (Botón)
+* Nueva Compra a Proveedor
+   * Proveedor (Listar)
+   * Factura
+   * Detalle
+   * Monto $
+   * Monto Pagado $
+   * Forma de Pago
+      * Monto $
+      * Caja (Listar)
+      * Cheque (Listar/Agregar(Diálogo))
+      * Guardar (Botón)
+   * Actualizar Insumos Proveedor (Listar)
+      * Guardar(Botón)
+* Agregar Pago Proveedores
+   * Proveedor (Listar)
+* Pagos desde Caja
+   * Caja (Listar)
+   * Monto $
+   * Detalle
+   * Agregar Pago desde Caja (Botón)
+* Pago con Cheques (Listar)
+   * Nuevo Cheque (Botón)
+      * Número de orden
+      * Monto $
+      * Banco (Listar)
+      * Emisor
+         * Propio (tilde-boolean)
+      * CUIT
+      * Vencimiento (Almanaque)
+      * Receptor (Listar)
+      * Recibido de
+      * Observaciones
+      * Agregar (Botón)
+      * Cancelar (Botón)
+   * Agregar Pago Proveedores
+
+
+Módulo Gestión de Materias Primas
+* Ver Materia prima (Lista)
+   * Nombre, Código, Precio, Unidad, Categoría, Proveedor, Marca (VerInsumo/Editar, Borrar)
+* Nueva Materia Prima
+   * Nombre
+   * Código
+   * Precio $
+   * Descripción
+   * Categoría
+   * Marca
+   * Proveedor (Listar)(Múltiples)
+   * Agregar (Botón)
+* Nuevo pedido de materiales
+   * Materia Prima (Listar)
+   * Código (Mostrar)
+   * Marca (Listar/Mostrar)
+   * Cantidad
+   * Detalle
+   * Urgente (tilde-boolean)
+   * Agregar (Botón)
+* Ver Pedidos de Insumos (Lista)
+   * Insumo, Cantidad, Código, Marca, Usuario, Estado, Fecha, Acciones
+Módulo Gestión de Productos
+* Plantillas de productos (Lista)
+   * Nombre, Categoría, Código, Detalle, Costo (VerDiseño/Editar, Borrar)
+      * Elegir (tilde-boolean)
+   * Lista de Precios
+      * Directo de Fábrica (Botón)
+      * Directo de Fábrica con Sugerido (Botón)
+      * Precio Clubes (Botón)
+      * Precio Final Sugerido (Botón)
+      * Importar Excel (Botón)
+* Nuevo Producto
+   * Nombre
+   * Categoría (Listar)
+      * Nueva Categoría
+         * Nombre Categoría
+   * Código/SKU
+   * Detalle
+   * Peso
+   * Desperdicio (kg)
+   * Talles (Tabla)
+      * Nuevo talle (Botón)
+         * Nombre Talle
+         * Porcentaje Incremento de costo
+   * Colores (Listar)(Múltiples)
+   * Insumos del Diseño (Lista)
+      * Materia Prima, Cantidad, Unidad, Costo (Editar, Eliminar)
+      * Agregar (botón)
+         * Diálogo
+            * Materia Prima
+            * Cantidad
+            * Costo (Mostrar/Modificar)
+   * Moldería
+      * Agregar Ficha Técnica (PDF)(Botón)
+      * Agregar Imágen (Botón)
+      * Agregar archivos
+   * Costo $
+   * Precios
+      * Directo de fábrica
+         * %
+         * $
+      * Clubes
+         * %
+         * $
+      * Final Sugerido
+         * %
+         * $
+   * Guardar(Botón)
+Módulo Gestión de Clientes
+* Ver Clientes (Lista)
+   * Nombre, Teléfono, Ciudad, Cuenta Corriente, Proveedor, Marca (VerCliente/Editar, Borrar)
+* Nuevo Cliente
+   * Nombre
+   * Teléfono
+   * email
+   * Dirección
+   * Ciudad
+   * Provincia
+   * CUIT
+   * Condición IVA
+   * Detalle
+   * Contactos
+      * Nombre
+      * Teléfono
+      * email
+      * Cargo
+      * Nuevo Contacto (Botón)
+   * Guardar (Botón)
+* Cuenta por Cliente
+   * Cliente (Listar)
+   * Cuenta Corriente (Lista)
+      * Detalle, Tipo, Monto $, Balance, Fecha, Usuario, Elegir (tilde-boolean)
+         * Bajar comprobante de venta (Botón)
+         * Exportar Excel
+         * Editar Movimiento (?)
+            * Detalle
+            * Tipo (Cobro-Venta)(Listar)
+            * Monto
+         * Borrar Movimiento (Botón)
+   * Agregar Movimiento
+      * Detalle
+      * Tipo (Cobro-Venta)(Listar)
+      * Monto $
+      * Agregar (Botón)
+   * Agregar Pago Caja
+      * Detalle
+      * Monto $
+      * Caja (Listar)
+      * Agregar Cobro (Botón)
+Gestión de Cotización/Presupuesto
+* Ver Presupuestos (Lista)
+   * Id, Nombre (Cliente), Teléfono, email, Fecha, Monto $, Elegir (tilde-boolean) (VerPresupuesto/Editar, Borrar)
+   * Imprimir Presupuesto (Botón)
+   * Ir a venta
+* Presupuesto Nuevo
+   * Datos del Presupuesto
+      * Número (Id)
+      * Fecha (Calendario)(?)
+   * Factura A
+      * Nombre (Cliente)
+      * Dirección, Ciudad y Código Postal (Cliente)
+      * Teléfono (Cliente)
+      * Email (Cliente)
+   * Detalles
+   * Artículos
+      * Artículo (Listar)
+      * Cantidad
+      * Importe $
+      * Agregar (Botón)
+      * Listado de Articulos seleccionados
+         * Artículo, Cantidad, Importe $, Elegir (tilde-boolean)
+      * Borrar Seleccionado (Botón)
+      * Total $
+      * Guardar (Botón)
+Gestión de Ventas
+* Nueva Venta
+   * Presupuesto
+      * idPresupuesto (Listar)
+   * Cliente (Listar)
+      * Cuenta (VerCuentaCorriente)
+      * Precio (Listar Tipo (Final, Directo de Fábrica, Clubes, Mayorista)
+      * Detalle
+   * Código de Barras (Lector)
+   * Producto (Listar)
+   * Cantidad
+   * Precio unitario $
+   * Total $
+   * Agregar (Botón)
+   * Agregar Descuento
+      * Motivo
+      * Monto a Aplicar $
+      * Porcentaje %
+      * Descuento Total $
+      * Aplicar Descuento (Botón)
+   * Items de Venta (Lista)
+      * Productos, Cantidad, Precio Unitario, Total, Elegir (tilde-boolean)
+   * Método de Pago
+   * Terminar Venta (Botón)
+* Ver Ventas (Lista)
+   * Desde (Almanaque)
+   * Hasta (Almanaque)
+   * Cargar (Botón)
+   * Monto $, Fecha, Usuario (VerVenta/Editar, Borrar)
+      * (VerVenta/Editar): Agregar OP Asociadas
+   * Exportar a Excel (Botón)
+Gestión de Nota de Pedido
+* Ver Ordenes de Pedido (Lista)
+   * idOrdenDePedido, Cliente, DetalleVenta, Fecha Entrega, Vendedor, Monto $, (VerNotaDePedido/Editar, Borrar)
+* Nueva Orden de Pedido
+   * IdVenta (Listar)
+   * Fecha de Entrega (Almanaque)
+   * Cliente (Mostrar)
+   * Forma de Envío (Mostrar)
+   * NombreContactoCliente (Mostrar)
+   * TeléfonoContactoCliente (Mostrar)
+   * emailContactoCliente (Mostrar)
+   * Estado del Pago (Mostrar)
+   * Vendedor (Mostrar)
+   * Listado de Productos Venta
+      * VerItemsDeVenta (Lista)
+         * Productos, Cantidad, Talle, Color, Detalle
+Gestión Orden de Producción
+* Nueva Orden de Producción
+   * Indumentaria
+      * Datos de la Orden
+         * id
+         * Nota de Pedido Asociada
+         * Equipo
+         * Detalle del Equipo
+         * Fecha
+         * Fecha Estimada de Entrega (Mostrar)
+         * Estado (Pendiente)
+      * Datos del Cliente
+         * Contacto (Mostrar)
+         * DNI (Mostrar)
+         * Dirección, Ciudad y Código Postal (Mostrar)
+         * Teléfono (Mostrar)
+         * email (Mostrar)
+         * Forma de Envío  (Mostrar)
+         * Vendedor (Listar)
+      * Datos del Pedido
+         * Producto (Listar)
+         * Escudo (Listar: Bordado, Sublimado, Vinilo, No lleva)
+         * Marca (Listar: Bordado, Sublimado, Vinilo, No lleva)
+         * Número (Listar: Sublimado, Vinilo, No lleva)
+         * Nombre (Listar: Sublimado, Vinilo, No lleva)
+         * Lugar del nombre (Listar: Arriba del Número, Abajo del Número, No lleva)
+         * Color Tela (Listar)
+         * Tela (Listar: Set de Microfibra, Pique, Elastano, Frisa, Algodón)
+         * Cuello (Listar: Redondo, Polo, Escote en V)
+         * Color Feston (Listar)
+         * Color Marca (Listar)
+         * Color TurboDry (Listar)
+         * Color Talles (Listar)
+         * Tira de Limpieza (?)
+      * Detalle del Pedido
+         * Detalles
+      * Plantilla de Talles
+         * Talle (Listar)
+         * Cantidad
+         * Arq (Botón)(?)
+         * Agregar (Botón)
+         * Listado de Talles
+            * Talle, Cantidad, Arq, Elegir (tilde-boolean)
+         * Total Prendas
+         * Eliminar Seleccionado (Botón)
+      * Escudo y Sponsors
+         * Agregar Escudo (Botón)
+         * Agregar Sponsors (Botón)
+         * Agregar Template (Botón)
+      * Guardar (Botón)
+   * Medias
+      * Datos de la Orden
+         * id
+         * Nota de Pedido Asociada
+         * Fecha
+         * Fecha Estimada de Entrega (Mostrar)
+         * Estado (Pendiente)
+      * Datos del Cliente
+         * Cliente (Mostrar)
+         * Dirección, Ciudad y Código Postal (Mostrar)
+         * Forma de Envío  (Mostrar)
+         * Vendedor (Listar)
+      * Datos del Pedido
+         * Producto (Listar)
+         * Modelo (Listar)(?)
+      * Detalle del Pedido
+         * Detalles
+      * Plantilla de Talles
+         * Talle (Listar)
+         * Cantidad
+         * Detalle Talle
+         * Agregar (Botón)
+         * Listado de Talles
+            * Talle, Cantidad, Detalle, Elegir (tilde-boolean)
+         * Total
+         * Eliminar Seleccionado (Botón)
+      * Colores
+         * Color Base (Listar)
+         * Color Secundario (Listar)
+         * Color Puño (Listar)
+         * Color Puntera (Listar)
+         * Color Talón (Listar)
+      * Especificaciones Técnicas
+         * Máquina (Listar)(?)
+         * Agujas
+         * Observaciones
+      * Agregar Archivos (Botón)
+      * Guardar (Botón)
+* Ver Ordenes de Producción
+   * Indumentaria
+      * id, Cliente, Producto, Prendas, Fecha de Entrega, Estado, Etapa, Elegir (VerOP/Editar, Borrar)
+      * Filtro (Listar)
+      * Cambiar Estado (Listar)
+      * Ver/Imprimir
+      * Exportar Lista a Excel
+   * Medias
+      * id, Cliente, Fecha de Entrega, Detalle, Estado, Etapa, Elegir (VerOP/Editar, Borrar)
+      * Filtro (Listar)
+      * Cambiar Estado (Listar)
+      * Ver/Imprimir
+      * Exportar Lista a Excel
+* Seguir OP
+   * Indumentaria
+      * Orden de Producción (Listar)
+         * Producto
+         * Nota de Pedido Asociada
+         * Fecha Estimada de Entrega (Mostrar)
+         * Vendedor
+      * Detalle del Pedido
+         * Detalles
+      * Bordadora
+         * Escudo (Mostrar)
+         * Marca (Mostrar)
+         * Color Feston
+         * Color Marca
+      * Personalizado
+         * Número (Mostrar)
+         * Nombre (Mostrar)
+         * Lugar del nombre (Mostrar)
+         * Color Tela (Mostrar)
+         * Tela (Mostrar)
+         * Cuello (Mostrar)
+         * Color TurboDry (Mostrar)
+         * Color Talles (Mostrar)
+      * Talles
+         * Talle, Cantidad, Arquero (Mostrar)
+      * Archivos (Mostrar)
+      * Proceso Actual
+         * Proceso Anterior
+         * Proceso siguiente
+            * Elegir
+               * Corte (tilde-boolean)
+               * Costura (tilde-boolean)
+               * Sublimación (tilde-boolean)
+               * Estampado (tilde-boolean)
+               * Bordado (tilde-boolean)
+               * Serigrafía (tilde-boolean)
+               * Limpieza/Planchado (tilde-boolean)
+               * Empaque (tilde-boolean)
+      * QR De Seguimiento Procesos
+   * Medias
+      * Orden de Producción (Listar)
+         * Nota de Pedido Asociada (Mostrar)
+         * Fecha Estimada de Entrega (Mostrar)
+         * Vendedor (Mostrar)
+         * Producto (Mostrar)
+         * Modelo (Mostrar)
+      * Detalle del Pedido
+         * Detalles
+      * Especificaciones
+         * Base, Secundario, Puño, Puntera, Talón (Mostrar)
+         * Máquina, Agujas, Observaciones (Mostrar)
+      * Talles
+         * Talle (Mostrar)
+         * Cantidad (Mostrar)
+         * Arquero (Mostrar)
+      * Archivos (Mostrar)
+      * Proceso Actual
+         * Proceso Anterior
+         * Proceso siguiente
+            * Elegir
+               * Tejido (tilde-boolean)
+               * Costura (tilde-boolean)
+               * Limpieza/Planchado (tilde-boolean)
+               * Empaque (tilde-boolean)
+      * QR De Seguimiento Procesos
+Gestión de Inventario
+* Materia Prima
+   * Almacén (Listar)
+      * Listado de Insumos (Lista)
+         * Nombre, Código, Categoría, Proveedor, Stock Actual, Unidad de Medida, Valor $ (VerInsumo, Editar, Borrar)
+      * Incorporar Materia Prima (Botón)
+         * Nombre (Listar)
+         * Proveedor (Listar)
+         * Marca (Listar)
+         * Precio $
+   * Nuevo Almacén (Botón)
+      * Fábrica (Listar)
+      * Nombre
+* Materia Productos
+   * Almacén (Listar)
+      * Listado de Ventas (Lista)
+         * idVenta, Cliente, idOP, Precio $, Fecha de Entrega, Entrega parcial (tilde-boolean), Remitos (VerVenta, Borrar)
+         * Filtro (Listar)
+   * Nuevo Almacén (Botón)
+      * Fábrica (Listar)
+      * Nombre
+Gestión de Remitos
+* Nuevo Remito
+   * Tipo de Remito (Listar: Venta. Interno)
+   * id
+   * Fecha (Calendario)
+   * Cliente (MostrarClienteVenta)
+   * Origen (Almacén)
+   * Destino (Almacén/Cliente)
+   * Agregar Producto
+      * Código de Barras (Lector)
+      * Producto (Listar)(Según Inventario)
+      * Cantidad (Según Inventario)
+      * Agregar (Botón)
+   * Items (MostrarItemsVenta)
+   * Observaciones
+* Ver Remitos
+   * Tipo (Listar)
+   * Id, Cliente, Origen, Destino, Estado (VerRemito, Editar, Borrar)
+   * Filtro (Listar)
+Gestión de RRHH
+* Gestión de Empleados
+   * Nuevo Empleado
+      * Nombre
+      * Apellido
+      * Fecha de Nacimiento (Almanaque)
+      * DNI
+      * Hijos
+      * Fábrica(Listar)
+         * Roles (Listar)
+      * Fecha Inicio Actividades (Almanaque)
+   * Gestión de Salarios
+      * Empleado (Listar)
+      * Monto $
+      * Detalles
+      * Fecha de Liquidación (Almanaque)
+   * Vacaciones/Permisos
+      * Licencia (Listar)
+         * Empleado (Listar)
+         * Fecha de Inicio (Almanaque)
+         * Fecha de Inicio (Almanaque)
+         * Detalles
+   * Carpetas Médicas
+      * Empleado (Listar)
+         * Fecha de Inicio (Almanaque)
+         * Fecha de Inicio (Almanaque)
+         * Descripción
+         * ART (tilde-boolean)
+         * Archivos (Botón)
+   * Ausentes
+      * Empleado (Listar)
+      * Fecha  (Almanaque)
+      * Detalle
+* Ver Empleados (Lista)
+   * Fábrica (Listar)
+   * Nombre (Listar)
+   * Apellido, Nombre, DNI, Fábrica, Roles, Estado, Ausentismo, Fecha Inicio Actividades (VerEmpleado, Editar, Borrar)
+Gestión Administración
+* Usuarios
+   * Nuevo Usuario
+      * Nombre y Apellido
+      * email
+      * Contraseña
+      * Roles (Listar: admin, gestion, user)
+   * Ver Usuarios (Lista)
+      * Nombre y Apellido, email, Rol (VerUsuario/Editar, Borrar)
+* Fábricas
+   * Nueva Fábrica
+      * Nombre
+      * Ubicación
+      * Teléfono
+      * Responsable (Listar Empleados)
+      * Capacidad Instalada
+         * Procesos (Lista)
+            * Agregar Proceso (Botón)
+               * Nombre
+               * Descripción
+               * Es Proceso Inicial (tilde-boolean)
+               * Aplica a Medias (tilde-boolean)
+               * Aplica a indumentaria (tilde-boolean)
+      * Empleados
+         * Roles (Lista)
+            * Agregar Rol (Botón)
+   * Lista de Fábricas
+      * Nombre, Ubicación, Teléfono, Responsable (VerFábrica/Editar, Borrar)
+Gestión Contable/Finanzas
+* Gestión de Cajas
+   * Cajas (Lista)
+      * Nombre
+      * Descripción
+      * Elegir (tilde-boolean)
+   * Nueva Caja (Botón)
+      * Nombre
+      * Descripción
+* Ver Cajas
+   * Caja (Listar)
+   * Lista
+      * Fecha, Tipo, Detalle, Monto, Acumulado, Usuario, Elegir (tilde-boolean)
+      * Agregar Movimiento (Botón)
+         * Tipo (Listar)
+         * Detalle
+         * Monto $
+      * Eliminar Movimiento (Botón)
+* Agregar Gasto
+   * Tipo Listar
+   * Descripción
+   * Con Efectivo o Transferencia
+      * Caja (Listar)
+      * Monto $
+      * Agregar (Botón)
+      * Cancelar (Botón)
+   * Con Cheque
+      * Cheque (Listar)
+         * Nuevo Cheque
+            * Número de orden
+            * Monto $
+            * Banco (Listar)
+            * Emisor
+               * Propio (tilde-boolean)
+            * CUIT
+            * Vencimiento (Almanaque)
+            * Receptor (Listar)
+            * Recibido de
+            * Observaciones
+            * Agregar (Botón)
+            * Cancelar (Botón)
+* Ver Gastos (Lista)
+   * Mes (Almanaque)
+   * Cargar Mes (Botón)
+   * Tipo, Detalle, Monto, Caja, Fecha, Usuario
+* Cheques
+   * Ver Cheques (Lista)
+      * Filtro (Listar)
+      * Número, Monto, Banco, Emisor, CUIT, Vencimiento, Receptor, Recibido de, Estado, Elegir (tilde-boolean)
+      * Ver todos los cheques (Botón)
+      * Agregar Cheque (Botón)
+         * Nuevo Cheque
+            * Número de orden
+            * Monto $
+            * Banco (Listar)
+            * Emisor
+               * Propio (tilde-boolean)
+            * CUIT
+            * Vencimiento (Almanaque)
+            * Receptor (Listar)
+            * Recibido de
+            * Observaciones
+            * Agregar (Botón)
+            * Cancelar (Botón)
+      * Editar (Botón)
+         * Editar Cheque
+            * Número de orden (Mostrar)
+            * Monto $ (Mostrar)
+            * Banco (Mostrar)
+            * Emisor (Mostrar)
+               * Propio (tilde-boolean) (Mostrar)
+            * CUIT (Mostrar)
+            * Vencimiento (Almanaque) (Mostrar)
+            * Receptor (Mostrar)
+            * Recibido de (Mostrar)
+            * Observaciones (Mostrar)
+            * Guardar (Botón)
+            * Cancelar (Botón)
+      * Borrar Cheque
+      * Estado (Listar: CARGADO, ENTREGADO, RECHAZADO, COBRADO, ANULADO)
+      * Cambiar Estado (Botón)
+   * Monto Total: (Mostrar)
+* Resumen Financiero
+   * Mes (Almanaque)
+   * Cargar Mes (Botón)
+   * Cajas: (Mostrar $)
+   * Cheques de Terceros Disponibles: (Mostrar $)
+   * Clientes: (Mostrar $)
+   * Proveedores: (Mostrar $)
+   * Cheques Propios: (Mostrar $)
+   * Resultado: (Mostrar $)
+* Resumen Gastos
+   * Mes (Almanaque)
+   * Cargar Mes (Botón)
+   * Listado de Gastos (Lista)
+      * Tipo (Mostrar)
+      * Monto (Mostrar)
+      * % (Mostrar)
+   * Total: (Mostrar)
+   * GRÁFICO
+* Reglas de Pago
+   * Efectivo
+   * Transferencia
+      * %
+   * Tarjeta
+      * Débito
+         * %
+      * Crédito
+         * Banco (Listar)
+            * Listado
+               * Cantidad de cuotas
+               * %
+   * Cheque
+      * Listado
+         * Tipo
+         * %
+   * Múltiple
+* Bancos
+   * Banco (Listar)
+   * Cuenta Corriente
+      * Movimiento (Listar: Extracción, Depósito, Transferencia, Pagos, Cobros)
+      * Monto $
+      * Descubierto $
+   * Caja de Ahorro
+      * Movimiento (Listar: Extracción, Depósito, Transferencia, Pagos, Cobros)
+      * Monto $
+   * Tarjeta de Crédito (Listar)
+   * Extracto Bancario
+      * Agregar Archivo (Botón)
