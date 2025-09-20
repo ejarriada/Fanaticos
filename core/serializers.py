@@ -1,0 +1,662 @@
+import datetime
+import json
+from decimal import Decimal
+from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.db import transaction
+from django.db.models import Max, Sum
+from .models import (
+    Product, Tenant, User, SystemRole, Process, OrderNote, ProductionOrder, ProductionOrderItem, ProductionOrderFile, 
+    RawMaterial, Brand, MateriaPrimaProveedor, PedidoMaterial, 
+    CuttingOrder, ProductionProcessLog, Local, Sale, Inventory, 
+    Supplier, PurchaseOrder, PurchaseOrderItem, Account, CashRegister, Transaction, 
+    Client, Invoice, Payment, BankStatement, BankTransaction, Bank, Check, 
+    PaymentMethodType, FinancialCostRule, Factory, EmployeeRole, Employee, 
+    Salary, Vacation, Permit, MedicalRecord, Quotation, QuotationItem, StockAdjustment,
+    Design, DesignMaterial, DesignProcess, SaleItem, DeliveryNote, DeliveryNoteItem, DesignFile, ProductFile,
+    Category, Size, Color, DesignSize, Contact
+)
+
+# --- Base and Helper Serializers ---
+
+class TenantAwareSerializer(serializers.ModelSerializer):
+    class Meta:
+        read_only_fields = ('tenant',)
+
+class TenantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tenant
+        fields = '__all__'
+
+class CategorySerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Category
+        fields = ['id', 'name']
+
+class SizeSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Size
+        fields = ['id', 'name', 'cost_percentage_increase']
+
+class ColorSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Color
+        fields = ['id', 'name', 'hex_code']
+
+# --- Design and Recipe Serializers ---
+
+class DesignMaterialSerializer(TenantAwareSerializer):
+    id = serializers.IntegerField(required=False)
+    raw_material_name = serializers.CharField(source='raw_material.name', read_only=True)
+    cost = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    
+    class Meta(TenantAwareSerializer.Meta):
+        model = DesignMaterial
+        fields = ['id', 'raw_material', 'raw_material_name', 'quantity', 'cost']
+
+class DesignProcessSerializer(TenantAwareSerializer):
+    id = serializers.IntegerField(required=False)
+    process_name = serializers.CharField(source='process.name', read_only=True)
+    cost = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = DesignProcess
+        fields = ['id', 'process', 'process_name', 'order', 'cost']
+
+class DesignFileSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = DesignFile
+        fields = ['id', 'file']
+
+class DesignSerializer(TenantAwareSerializer):
+    materials = DesignMaterialSerializer(source='designmaterial_set', many=True, required=False)
+    processes = DesignProcessSerializer(source='designprocess_set', many=True, required=False)
+    design_files = DesignFileSerializer(many=True, read_only=True)
+    category = CategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), source='category', write_only=True, allow_null=True)
+    sizes = SizeSerializer(many=True, read_only=True)
+    size_ids = serializers.PrimaryKeyRelatedField(queryset=Size.objects.all(), source='sizes', many=True, write_only=True)
+    calculated_cost = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = Design
+        fields = ['id', 'name', 'product_code', 'description', 'materials', 'processes', 'design_files', 'category', 'category_id', 'sizes', 'size_ids', 'calculated_cost']
+
+# --- User and Client Serializers ---
+
+class SystemRoleSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = SystemRole
+        fields = '__all__'
+
+class UserSerializer(serializers.ModelSerializer):
+    roles = serializers.PrimaryKeyRelatedField(many=True, queryset=SystemRole.objects.all())
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'first_name', 'last_name', 'roles')
+
+class UserCreateSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+    roles = serializers.PrimaryKeyRelatedField(many=True, queryset=SystemRole.objects.all())
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'password', 'first_name', 'last_name', 'roles', 'tenant')
+    def create(self, validated_data):
+        roles_data = validated_data.pop('roles')
+        user = User.objects.create_user(**validated_data)
+        user.roles.set(roles_data)
+        return user
+
+class ContactSerializer(TenantAwareSerializer):
+    id = serializers.IntegerField(required=False)
+    class Meta(TenantAwareSerializer.Meta):
+        model = Contact
+        fields = ['id', 'name', 'phone', 'email', 'position']
+
+class ClientSerializer(TenantAwareSerializer):
+    contacts = ContactSerializer(many=True, required=False)
+    class Meta(TenantAwareSerializer.Meta):
+        model = Client
+        fields = ['id', 'name', 'cuit', 'email', 'phone', 'address', 'city', 'province', 'iva_condition', 'details', 'contacts']
+
+# --- Commercial Flow Serializers (Quotation, Sale) ---
+
+class SimpleProductSerializer(TenantAwareSerializer):
+    """Serializador simple de Producto para representaciones anidadas."""
+    size = SizeSerializer(read_only=True)
+    colors = ColorSerializer(many=True, read_only=True)
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = Product
+        fields = ['id', 'name', 'description', 'size', 'colors']
+
+class SaleItemSerializer(TenantAwareSerializer):
+    """Serializador de Item de Venta con detalles del producto anidados."""
+    product = SimpleProductSerializer(read_only=True)
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = SaleItem
+        fields = ['id', 'product', 'quantity', 'unit_price', 'cost']
+
+class SaleForOrderNoteSerializer(serializers.ModelSerializer):
+    """Serializer simplificado para la Venta dentro de la Nota de Pedido."""
+    client = ClientSerializer(read_only=True)
+    user = UserSerializer(read_only=True)
+    items = SaleItemSerializer(many=True, read_only=True)
+    payment_status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Sale
+        fields = ['id', 'client', 'user', 'total_amount', 'items', 'payment_status']
+
+    def get_payment_status(self, obj):
+        """
+        Calcula el estado del pago de la venta basado en las transacciones asociadas.
+        """
+        paid_amount = Transaction.objects.filter(
+            tenant=obj.tenant,
+            related_sale=obj,
+            amount__gt=0
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+        if paid_amount >= obj.total_amount:
+            return "Pagado"
+        elif paid_amount > 0:
+            return "Pago Parcial"
+        else:
+            return "Pendiente de Pago"
+
+
+class OrderNoteSerializer(TenantAwareSerializer):
+    """
+    Serializador para las Notas de Pedido.
+    Permite crear una nota de pedido a partir de un `sale_id`.
+    La venta se muestra de forma anidada en modo de solo lectura.
+    """
+    sale = SaleForOrderNoteSerializer(read_only=True)
+    sale_id = serializers.PrimaryKeyRelatedField(
+        queryset=Sale.objects.filter(order_note__isnull=True), 
+        source='sale', 
+        write_only=True,
+        help_text="ID de la Venta para la cual se crea la Nota de Pedido. La venta no debe tener ya una nota de pedido asociada."
+    )
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = OrderNote
+        fields = [
+            'id',
+            'sale',
+            'sale_id',
+            'order_date',
+            'estimated_delivery_date',
+            'shipping_method',
+            'status',
+            'details'
+        ]
+        read_only_fields = ('order_date',)
+
+    def validate_sale_id(self, value):
+        """
+        Asegura que la venta no tenga ya una nota de pedido asociada.
+        Este chequeo es redundante si el queryset del campo funciona bien,
+        pero sirve como una doble verificación.
+        """
+        if OrderNote.objects.filter(sale=value).exists():
+            raise serializers.ValidationError("Esta venta ya tiene una nota de pedido asociada.")
+        return value
+
+
+
+class QuotationItemSerializer(TenantAwareSerializer):
+    product_name = serializers.SerializerMethodField()
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = QuotationItem
+        fields = ['id', 'product', 'product_name', 'quantity', 'unit_price', 'cost']
+
+    def get_product_name(self, obj):
+        if obj.product:
+            return obj.product.name
+        return "Producto no encontrado"
+
+
+class QuotationSerializer(TenantAwareSerializer):
+    items = QuotationItemSerializer(many=True)
+    client = ClientSerializer(read_only=True)
+    client_id = serializers.PrimaryKeyRelatedField(
+        queryset=Client.objects.all(), source='client', write_only=True
+    )
+    user = UserSerializer(read_only=True)
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = Quotation
+        fields = ['id', 'quotation_id', 'client', 'client_id', 'date', 'total_amount', 'status', 'items', 'user']
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        quotation = Quotation.objects.create(**validated_data)
+        total_amount = 0
+        for item_data in items_data:
+            total_amount += item_data['quantity'] * item_data['unit_price']
+            QuotationItem.objects.create(quotation=quotation, tenant=quotation.tenant, **item_data)
+        quotation.total_amount = total_amount
+        quotation.save()
+        return quotation
+
+class SaleSerializer(TenantAwareSerializer):
+    items = SaleItemSerializer(many=True)
+    client = ClientSerializer(read_only=True)
+    client_id = serializers.PrimaryKeyRelatedField(
+        queryset=Client.objects.all(), source='client', write_only=True
+    )
+    related_quotation = QuotationSerializer(read_only=True)
+    user = UserSerializer(read_only=True) 
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = Sale
+        fields = ['id', 'client', 'client_id', 'sale_date', 'local', 'total_amount', 'payment_method', 'related_quotation', 'items', 'user']
+        read_only_fields = ('tenant', 'sale_date')
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        with transaction.atomic():
+            sale = Sale.objects.create(**validated_data)
+            for item_data in items_data:
+                SaleItem.objects.create(sale=sale, tenant=sale.tenant, **item_data)
+        return sale
+
+# --- Other Model Serializers ---
+
+class ProductSerializer(TenantAwareSerializer):
+    cost = serializers.SerializerMethodField()
+    design = DesignSerializer(read_only=True)
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = Product
+        fields = ['id', 'name', 'description', 'design', 'size', 'colors', 'sku', 'factory_price', 'club_price', 'suggested_final_price', 'weight', 'waste', 'is_manufactured', 'cost']
+    def get_cost(self, obj):
+        if obj.design:
+            return obj.design.calculated_cost
+        return 0.00
+
+class DeliveryNoteItemSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = DeliveryNoteItem
+        fields = '__all__'
+
+class DeliveryNoteSerializer(TenantAwareSerializer):
+    items = DeliveryNoteItemSerializer(many=True)
+    class Meta(TenantAwareSerializer.Meta):
+        model = DeliveryNote
+        fields = '__all__'
+
+class ProductFileSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = ProductFile
+        fields = ['id', 'file']
+
+class ProcessSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Process
+        fields = '__all__'
+
+
+
+class ProductionOrderItemSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = ProductionOrderItem
+        fields = ['id', 'product', 'quantity', 'size', 'color', 'customizations']
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.product:
+            representation['product'] = SimpleProductSerializer(instance.product, context=self.context).data
+        return representation
+
+class ProductionOrderFileSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = ProductionOrderFile
+        fields = ['id', 'file', 'description']
+
+class ProductionOrderSerializer(TenantAwareSerializer):
+    items = ProductionOrderItemSerializer(many=True)
+    files = ProductionOrderFileSerializer(many=True, read_only=True)
+    
+    # This field handles input (ID) for write operations.
+    # For read operations, to_representation will replace the ID with a nested object.
+    order_note = serializers.PrimaryKeyRelatedField(
+        queryset=OrderNote.objects.all(), allow_null=True, required=False # Make optional
+    )
+    base_product = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(), allow_null=True, required=False # Make optional
+    )
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = ProductionOrder
+        fields = [
+            'id',
+            'order_note',
+            'base_product', # New field
+            'equipo',       # New field
+            'detalle_equipo', # New field
+            'customization_details', # New field
+            'op_type',
+            'status',
+            'creation_date',
+            'current_process',
+            'details',
+            'items',
+            'files'
+        ]
+        read_only_fields = ('creation_date',)
+
+    def to_representation(self, instance):
+        """
+        On read, replace the order_note ID with a full nested object.
+        """
+        representation = super().to_representation(instance)
+        if instance.order_note:
+            representation['order_note'] = OrderNoteSerializer(instance.order_note, context=self.context).data
+        if instance.base_product: # Also nest base_product
+            representation['base_product'] = SimpleProductSerializer(instance.base_product, context=self.context).data
+        return representation
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        
+        # Pop file lists before calling super().create()
+        escudo_files = validated_data.pop('escudo_files', [])
+        sponsor_files = validated_data.pop('sponsor_files', [])
+        template_files = validated_data.pop('template_files', [])
+
+        with transaction.atomic():
+            production_order = ProductionOrder.objects.create(**validated_data)
+            for item_data in items_data:
+                ProductionOrderItem.objects.create(
+                    production_order=production_order, 
+                    tenant=production_order.tenant, 
+                    **item_data
+                )
+            
+            # Create ProductionOrderFile instances
+            for file_obj in escudo_files:
+                ProductionOrderFile.objects.create(
+                    production_order=production_order,
+                    tenant=production_order.tenant,
+                    file=file_obj,
+                    file_type='escudo'
+                )
+            for file_obj in sponsor_files:
+                ProductionOrderFile.objects.create(
+                    production_order=production_order,
+                    tenant=production_order.tenant,
+                    file=file_obj,
+                    file_type='sponsor'
+                )
+            for file_obj in template_files:
+                ProductionOrderFile.objects.create(
+                    production_order=production_order,
+                    tenant=production_order.tenant,
+                    file=file_obj,
+                    file_type='template'
+                )
+        return production_order
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items')
+        
+        # Pop file lists before calling super().update()
+        escudo_files = validated_data.pop('escudo_files', [])
+        sponsor_files = validated_data.pop('sponsor_files', [])
+        template_files = validated_data.pop('template_files', [])
+
+        # Update the ProductionOrder instance's scalar fields
+        instance.order_note = validated_data.get('order_note', instance.order_note)
+        instance.base_product = validated_data.get('base_product', instance.base_product)
+        instance.equipo = validated_data.get('equipo', instance.equipo)
+        instance.detalle_equipo = validated_data.get('detalle_equipo', instance.detalle_equipo)
+        instance.customization_details = validated_data.get('customization_details', instance.customization_details)
+        instance.op_type = validated_data.get('op_type', instance.op_type)
+        instance.status = validated_data.get('status', instance.status)
+        instance.current_process = validated_data.get('current_process', instance.current_process)
+        instance.details = validated_data.get('details', instance.details)
+        instance.save()
+
+        # Handle the nested items by replacing them.
+        with transaction.atomic():
+            instance.items.all().delete()
+            for item_data in items_data:
+                ProductionOrderItem.objects.create(
+                    production_order=instance,
+                    tenant=instance.tenant,
+                    **item_data
+                )
+            
+            # Handle files: delete existing and create new ones
+            instance.files.all().delete() # Delete all existing files
+            for file_obj in escudo_files:
+                ProductionOrderFile.objects.create(
+                    production_order=instance,
+                    tenant=instance.tenant,
+                    file=file_obj,
+                    file_type='escudo'
+                )
+            for file_obj in sponsor_files:
+                ProductionOrderFile.objects.create(
+                    production_order=instance,
+                    tenant=instance.tenant,
+                    file=file_obj,
+                    file_type='sponsor'
+                )
+            for file_obj in template_files:
+                ProductionOrderFile.objects.create(
+                    production_order=instance,
+                    tenant=instance.tenant,
+                    file=file_obj,
+                    file_type='template'
+                )
+        return instance
+
+class CuttingOrderSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = CuttingOrder
+        fields = '__all__'
+
+class ProductionProcessLogSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = ProductionProcessLog
+        fields = '__all__'
+
+class LocalSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Local
+        fields = '__all__'
+
+class InventorySerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Inventory
+        fields = '__all__'
+
+class SupplierSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Supplier
+        fields = '__all__'
+
+class BrandSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Brand
+        fields = '__all__'
+
+class RawMaterialSerializer(TenantAwareSerializer):
+    highest_cost = serializers.SerializerMethodField()
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = RawMaterial
+        fields = '__all__'
+
+    def get_highest_cost(self, obj):
+        highest_cost = obj.proveedores.filter(tenant=obj.tenant).aggregate(max_cost=Max('cost'))['max_cost']
+        return highest_cost if highest_cost is not None else 0.00
+
+class MateriaPrimaProveedorSerializer(TenantAwareSerializer):
+    raw_material = serializers.PrimaryKeyRelatedField(
+        queryset=RawMaterial.objects.all()
+    )
+    supplier = serializers.PrimaryKeyRelatedField(queryset=Supplier.objects.all())
+    brands = serializers.PrimaryKeyRelatedField(
+        queryset=Brand.objects.all(), many=True, required=False
+    )
+    
+    name = serializers.CharField(source='raw_material.name', read_only=True)
+    category = serializers.CharField(source='raw_material.category', read_only=True)
+    unit_of_measure = serializers.CharField(source='raw_material.unit_of_measure', read_only=True)
+    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = MateriaPrimaProveedor
+        fields = [
+            'id', 'raw_material', 'supplier', 'brands', 'supplier_code', 
+            'cost', 'current_stock', 'batch_number', 'qr_code_data',
+            'name', 'category', 'unit_of_measure', 'supplier_name'
+        ]
+        read_only_fields = ('batch_number', 'qr_code_data')
+
+class PurchaseOrderSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = PurchaseOrder
+        fields = '__all__'
+
+class PurchaseOrderItemSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = PurchaseOrderItem
+        fields = '__all__'
+
+class AccountSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Account
+        fields = '__all__'
+
+class CashRegisterSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = CashRegister
+        fields = '__all__'
+
+class TransactionSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Transaction
+        fields = '__all__'
+
+class InvoiceSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Invoice
+        fields = '__all__'
+
+class PaymentSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Payment
+        fields = '__all__'
+
+class BankStatementSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = BankStatement
+        fields = '__all__'
+
+class BankTransactionSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = BankTransaction
+        fields = '__all__'
+
+class BankSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Bank
+        fields = '__all__'
+
+class PaymentMethodTypeSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = PaymentMethodType
+        fields = '__all__'
+
+class FinancialCostRuleSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = FinancialCostRule
+        fields = '__all__'
+
+class FactorySerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Factory
+        fields = '__all__'
+
+class EmployeeRoleSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = EmployeeRole
+        fields = '__all__'
+
+class EmployeeSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Employee
+        fields = '__all__'
+
+class SalarySerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Salary
+        fields = '__all__'
+
+class VacationSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Vacation
+        fields = '__all__'
+
+class PermitSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Permit
+        fields = '__all__'
+
+class MedicalRecordSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = MedicalRecord
+        fields = '__all__'
+
+class CheckSerializer(TenantAwareSerializer):
+    class Meta(TenantAwareSerializer.Meta):
+        model = Check
+        fields = '__all__'
+
+class StockAdjustmentSerializer(TenantAwareSerializer):
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = StockAdjustment
+        fields = '__all__'
+        read_only_fields = ('tenant', 'created_at', 'user')
+
+    def validate(self, data):
+        request = self.context.get("request")
+        if request and hasattr(request, "user"):
+            data['user'] = request.user
+        return data
+
+class PedidoMaterialSerializer(TenantAwareSerializer):
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = PedidoMaterial
+        fields = '__all__'
+        read_only_fields = ('tenant', 'request_date', 'user')
+
+    def validate(self, data):
+        request = self.context.get("request")
+        if request and hasattr(request, "user"):
+            data['user'] = request.user
+        return data
+
+class ProjectedDataSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    value = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+class TenantTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        tenant_id = self.context['request'].META.get('HTTP_X_TENANT_ID')
+        if tenant_id:
+            data['tenant_id'] = tenant_id
+        return data
