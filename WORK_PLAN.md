@@ -19,19 +19,20 @@ Se ha realizado un análisis exhaustivo del sistema para identificar problemas d
 
 ## 2. Pasos para la Puesta en Marcha (Post-Reinicio)
 
-- **[PENDIENTE] Reinicio del Equipo:**
-  - **Acción:** El usuario reiniciará el equipo.
+- **[COMPLETADO] Reinicio del Equipo:**
+  - **Acción:** El usuario reinició el equipo.
   - **Objetivo:** Liberar todos los puertos de red (`8000`, `3001`, `3002`) que estaban previamente ocupados.
 
-- **[PENDIENTE] Levantar el Entorno Docker:**
+- **[COMPLETADO] Levantar el Entorno Docker:**
   - **Comando:** `docker-compose up --build -d`
   - **Objetivo:** Construir las imágenes de los contenedores e iniciarlos en segundo plano una vez que los puertos estén libres.
+  - **Nota:** Se requirió iniciar el servicio de Docker (`sudo systemctl start docker`) y solucionar un problema de dependencias en `frontend_comercializadora`.
 
 ## 3. Verificación Final
 
-Una vez que los contenedores estén en ejecución:
+Una vez que los contenedores están en ejecución:
 
-1.  **Verificar Logs:** Ejecutar `docker-compose logs -f` para ver la salida de los tres contenedores y asegurar que no haya errores.
-2.  **Verificar Backend:** Abrir en un navegador o usar `curl` para acceder a `http://localhost:8000/api/`. Se debería obtener una respuesta de la API.
-3.  **Verificar Frontend Comercializadora:** Abrir en un navegador `http://localhost:3001`. Debería cargar la aplicación de React.
-4.  **Verificar Frontend Manufacturera:** Abrir en un navegador `http://localhost:3002`. Debería cargar la aplicación de React.
+1.  **[COMPLETADO] Verificar Logs:** Ejecutar `docker-compose logs` para ver la salida de los tres contenedores y asegurar que no haya errores.
+2.  **[COMPLETADO] Verificar Backend:** Usar `curl` para acceder a `http://localhost:8000/api/`. Se obtuvo una respuesta correcta.
+3.  **[COMPLETADO] Verificar Frontend Comercializadora:** Usar `curl` para acceder a `http://localhost:3001`. Se obtuvo un código de estado 200.
+4.  **[COMPLETADO] Verificar Frontend Manufacturera:** Usar `curl` para acceder a `http://localhost:3002`. Se obtuvo un código de estado 200.
