@@ -43,7 +43,6 @@ const Sidebar = ({ open, drawerWidth }) => {
         { text: 'Notas de Pedido', icon: <DescriptionIcon />, path: '/notas-de-pedido' },
         { text: 'Órdenes de Producción', icon: <ProductionQuantityLimitsIcon />, path: '/ordenes-de-produccion' },
         { text: 'Seguimiento de Producción', icon: <TimelineIcon />, path: '/seguimiento-produccion' },
-        { text: 'Órdenes de Corte', icon: <ContentCutIcon />, path: '/cutting-orders' },
         { text: 'Registros de Proceso', icon: <ArticleIcon />, path: '/production-process-logs' },
         { text: 'Inventario', icon: <InventoryIcon />, path: '/inventory' }, // Keep this one, remove others
         { text: 'Gestión de Productos', icon: <ProductionQuantityLimitsIcon />, path: '/products' }, // Added this line

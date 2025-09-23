@@ -15,7 +15,6 @@ import ProcessManagement from './components/modules/ProcessManagement';
 import OrderNoteManagement from './components/modules/OrderNoteManagement';
 import ProductionOrderManagement from './components/modules/ProductionOrderManagement';
 import MateriasPrimasModule from './components/modules/MateriasPrimasModule';
-import CuttingOrderManagement from './components/modules/CuttingOrderManagement';
 import ProductosModule from './components/modules/ProductosModule';
 import ProductionProcessLogManagement from './components/modules/ProductionProcessLogManagement';
 import FactoryManagement from './components/modules/FactoryManagement';
@@ -116,7 +115,6 @@ function MainApp() {
           <Route path="/notas-de-pedido" element={<PrivateRoute><OrderNoteManagement /></PrivateRoute>} />
           <Route path="/ordenes-de-produccion" element={<PrivateRoute><ProductionOrderManagement /></PrivateRoute>} />
           <Route path="/materias-primas" element={<PrivateRoute><MateriasPrimasModule /></PrivateRoute>} />
-          <Route path="/cutting-orders" element={<PrivateRoute><CuttingOrderManagement /></PrivateRoute>} />
           <Route path="/production-process-logs" element={<PrivateRoute><ProductionProcessLogManagement /></PrivateRoute>} />
           <Route path="/seguimiento-produccion" element={<PrivateRoute><ProductionTracking /></PrivateRoute>} />
           <Route path="/designs" element={<Navigate to="/products" replace />} />
