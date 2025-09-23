@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios'; // Import axios
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
@@ -21,15 +22,16 @@ const LoginPage = () => {
                 return;
             }
             try {
-                const response = await fetch(`http://localhost:8000/api/tenants/?name=${tenantName}`);
-                const data = await response.json();
-                if (response.ok && data && data.length > 0) {
+                const response = await axios.get(`http://localhost:8000/api/tenants/?name=${tenantName}`);
+                const data = response.data;
+                if (data && data.length > 0) {
                     setCurrentTenantId(data[0].id);
                 } else {
                     setError(`Tenant with name "${tenantName}" not found.`);
                 }
             } catch (err) {
                 setError('Failed to fetch tenant ID.');
+                console.error("Error fetching tenant ID:", err);
             } finally {
                 setLoadingTenant(false);
             }

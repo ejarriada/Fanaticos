@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
-import { setupAxiosInterceptors } from '../utils/axiosInstance'; // IMPORT THE SETUP FUNCTION
+import { setupAxiosInterceptors } from '../utils/axiosInstance';
 
 const AuthContext = createContext(null);
 
@@ -10,7 +11,6 @@ export const AuthProvider = ({ children }) => {
     const [tenantId, setTenantId] = useState(null);
     const [isAuthLoading, setAuthLoading] = useState(true);
 
-    // This effect syncs the axios interceptor with the auth state
     useEffect(() => {
         setupAxiosInterceptors(authToken, tenantId);
     }, [authToken, tenantId]);
@@ -44,26 +44,20 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = async (email, password, tenant) => {
-        const response = await fetch('http://localhost:8000/api/token/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Tenant-ID': tenant,
-            },
-            body: JSON.stringify({ email, password }),
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
+        try {
+            const response = await axios.post('http://localhost:8000/api/token/', { email, password }, {
+                headers: { 'X-Tenant-ID': tenant }
+            });
+            const data = response.data;
             setAuthToken(data);
             setUser(jwtDecode(data.access));
             setTenantId(tenant);
             localStorage.setItem('authToken', JSON.stringify(data));
             localStorage.setItem('tenantId', tenant);
             return { success: true };
-        } else {
-            return { success: false, error: data.detail || 'Login failed' };
+        } catch (error) {
+            const errorDetail = error.response?.data?.detail || 'Login failed';
+            return { success: false, error: errorDetail };
         }
     };
 
@@ -74,47 +68,6 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('authToken');
         localStorage.removeItem('tenantId');
     };
-
-    // This token refresh logic can be simplified or removed if the response interceptor handles it well
-    // For now, let's keep it as a backup.
-    useEffect(() => {
-        const updateToken = async () => {
-            if (!authToken) return;
-
-            try {
-                const response = await fetch('http://localhost:8000/api/token/refresh/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Tenant-ID': tenantId,
-                    },
-                    body: JSON.stringify({ refresh: authToken.refresh }),
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    const newAuthToken = { ...authToken, access: data.access };
-                    setAuthToken(newAuthToken);
-                    setUser(jwtDecode(data.access));
-                    localStorage.setItem('authToken', JSON.stringify(newAuthToken));
-                } else {
-                    logout();
-                }
-            } catch (error) {
-                console.error("Token refresh failed:", error);
-                logout();
-            }
-        };
-
-        const fiveMinutes = 1000 * 60 * 5;
-        let interval = setInterval(() => {
-            if (authToken) {
-                updateToken();
-            }
-        }, fiveMinutes);
-        return () => clearInterval(interval);
-    }, [authToken, tenantId]);
 
     const contextData = {
         user,

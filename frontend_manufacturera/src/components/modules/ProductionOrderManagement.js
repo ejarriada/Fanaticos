@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import {
     Box, Button, Paper, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, IconButton, Typography, CircularProgress, Alert,
@@ -15,6 +16,7 @@ const ProductionOrderManagement = () => {
     const [productionOrders, setProductionOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const { tenantId } = useAuth();
     
     // State for dialogs and flow control
     const [isCreationTypeDialogOpen, setCreationTypeDialogOpen] = useState(false);
@@ -37,8 +39,10 @@ const ProductionOrderManagement = () => {
     };
 
     useEffect(() => {
-        fetchProductionOrders();
-    }, []);
+        if (tenantId) {
+            fetchProductionOrders();
+        }
+    }, [tenantId]);
 
     const handleNewOrderClick = () => {
         setSelectedOrder(null);

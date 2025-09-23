@@ -319,16 +319,14 @@ class ProductionOrderFileSerializer(TenantAwareSerializer):
         fields = ['id', 'file', 'description']
 
 class ProductionOrderSerializer(TenantAwareSerializer):
-    items = ProductionOrderItemSerializer(many=True)
+    items = ProductionOrderItemSerializer(many=True, required=False)
     files = ProductionOrderFileSerializer(many=True, read_only=True)
     
-    # This field handles input (ID) for write operations.
-    # For read operations, to_representation will replace the ID with a nested object.
     order_note = serializers.PrimaryKeyRelatedField(
-        queryset=OrderNote.objects.all(), allow_null=True, required=False # Make optional
+        queryset=OrderNote.objects.all(), allow_null=True, required=False
     )
     base_product = serializers.PrimaryKeyRelatedField(
-        queryset=Product.objects.all(), allow_null=True, required=False # Make optional
+        queryset=Product.objects.all(), allow_null=True, required=False
     )
 
     class Meta(TenantAwareSerializer.Meta):
@@ -336,10 +334,10 @@ class ProductionOrderSerializer(TenantAwareSerializer):
         fields = [
             'id',
             'order_note',
-            'base_product', # New field
-            'equipo',       # New field
-            'detalle_equipo', # New field
-            'customization_details', # New field
+            'base_product',
+            'equipo',
+            'detalle_equipo',
+            'customization_details',
             'op_type',
             'status',
             'creation_date',
@@ -349,6 +347,24 @@ class ProductionOrderSerializer(TenantAwareSerializer):
             'files'
         ]
         read_only_fields = ('creation_date',)
+
+    def to_internal_value(self, data):
+        # Handle JSON strings in FormData
+        if isinstance(data.get('items'), str):
+            try:
+                data = data.copy() # Make data mutable
+                data['items'] = json.loads(data['items'])
+            except (json.JSONDecodeError, TypeError):
+                raise serializers.ValidationError({"items": "Invalid JSON format."})
+        
+        if isinstance(data.get('customization_details'), str):
+            try:
+                data = data.copy()
+                data['customization_details'] = json.loads(data['customization_details'])
+            except (json.JSONDecodeError, TypeError):
+                raise serializers.ValidationError({"customization_details": "Invalid JSON format."})
+
+        return super().to_internal_value(data)
 
     def to_representation(self, instance):
         """
@@ -362,7 +378,7 @@ class ProductionOrderSerializer(TenantAwareSerializer):
         return representation
 
     def create(self, validated_data):
-        items_data = validated_data.pop('items')
+        items_data = validated_data.pop('items', [])
         
         # Pop file lists before calling super().create()
         escudo_files = validated_data.pop('escudo_files', [])

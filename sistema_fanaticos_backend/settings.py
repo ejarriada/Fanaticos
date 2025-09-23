@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-)7l*evc4pv66i&zyhe^c3_efq8blz5v5f6he6cnzzfo)f920&0
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,backend').split(',')
 
 
 # Application definition
@@ -175,6 +175,16 @@ AUTHENTICATION_BACKENDS = ['core.backends.TenantAwareModelBackend']
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://backend:8000",
+    "http://frontend_manufacturera:3000",
+    "http://frontend_comercializadora:3000",
+]
+
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
@@ -185,5 +195,5 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
-    'x-tenant-id', # Allow X-Tenant-ID header
+    'x-tenant-id',
 ]

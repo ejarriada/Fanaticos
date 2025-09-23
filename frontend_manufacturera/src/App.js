@@ -96,7 +96,7 @@ function MainApp() {
             path="/"
             element={
               <PrivateRoute>
-                <ManufacturingDashboard />
+                <Navigate to="/ordenes-de-produccion" replace />
               </PrivateRoute>
             }
           />
