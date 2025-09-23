@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Dialog, DialogActions, DialogContent, DialogTitle, Button, TextField, 
     FormControl, InputLabel, Select, MenuItem, Typography, Box, Grid, Paper,
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Divider, Checkbox, FormControlLabel, List, ListItem, ListItemText, ListItemSecondaryAction
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, 
+    Divider, Checkbox, FormControlLabel, List, ListItem, ListItemText, ListItemSecondaryAction
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
@@ -19,7 +20,12 @@ const Section = ({ title, children }) => (
 );
 
 const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creationFlow }) => {
-    const [formData, setFormData] = useState({ items: [] });
+    const [formData, setFormData] = useState({ 
+        items: [], 
+        customization_details: {},
+        estimated_delivery_date: '',
+        status: 'Pendiente'
+    });
     const [currentItem, setCurrentItem] = useState({ size: '', quantity: '', is_goalie: false });
     const [editingIndex, setEditingIndex] = useState(null);
     
@@ -41,6 +47,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
     const [loading, setLoading] = useState(false);
 
     const selectedOrderNote = orderNotes.find(on => on.id === formData.order_note);
+    
     const selectedBaseProduct = React.useMemo(() => {
         if (!formData.base_product) return null;
         const product = products.find(p => p.id === parseInt(formData.base_product));
@@ -50,9 +57,6 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
         }
         return product;
     }, [products, formData.base_product]);
-
-    // Modificación para el useEffect que inicializa el formulario
-    // Reemplazar la sección de carga de productos
 
     useEffect(() => {
         if (!open) return;
@@ -64,9 +68,10 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                 const productsPromise = api.list('/products/?is_manufactured=true');
                 const notesPromise = api.list('/order-notes/?status=Pendiente');
 
-                const [productsData, notesData, colorsData] = await Promise.all([productsPromise, notesPromise, colorsPromise]);
+                const [productsData, notesData, colorsData] = await Promise.all([
+                    productsPromise, notesPromise, colorsPromise
+                ]);
                 
-                // Cargar productos SIN intentar cargar talles todavía
                 setProducts(productsData.results || productsData || []);
                 setColors(colorsData.results || colorsData || []);
                 
@@ -85,7 +90,12 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         customization_details: order.customization_details || {},
                     });
                 } else {
-                    setFormData({ items: [], customization_details: {} });
+                    setFormData({ 
+                        items: [], 
+                        customization_details: {},
+                        estimated_delivery_date: '',
+                        status: 'Pendiente'
+                    });
                 }
 
             } catch (err) {
@@ -102,7 +112,13 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
         const { name, value } = e.target;
         if (name.startsWith('customization_')) {
             const key = name.replace('customization_', '');
-            setFormData(prev => ({ ...prev, customization_details: { ...prev.customization_details, [key]: value } }));
+            setFormData(prev => ({ 
+                ...prev, 
+                customization_details: { 
+                    ...prev.customization_details, 
+                    [key]: value 
+                } 
+            }));
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
         }
@@ -114,12 +130,18 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
     };
 
     const handleAddItem = () => {
-        if (!currentItem.size || !currentItem.quantity) return;
+        if (!currentItem.size || !currentItem.quantity || !formData.base_product) return;
+        
+        const newItem = { 
+            ...currentItem, 
+            product: formData.base_product 
+        };
+
         const newItems = [...(formData.items || [])];
         if (editingIndex !== null) {
-            newItems[editingIndex] = currentItem;
+            newItems[editingIndex] = newItem;
         } else {
-            newItems.push(currentItem);
+            newItems.push(newItem);
         }
         setFormData(prev => ({ ...prev, items: newItems }));
         setCurrentItem({ size: '', quantity: '', is_goalie: false });
@@ -152,22 +174,25 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
     const handleSave = () => {
         const data = new FormData();
         
-        // Append main fields
         Object.keys(formData).forEach(key => {
             if (key === 'items' || key === 'customization_details') {
                 data.append(key, JSON.stringify(formData[key]));
-            } else if (formData[key] !== null && formData[key] !== undefined) {
+            } else if (formData[key] !== null && formData[key] !== undefined && formData[key] !== '') {
                 data.append(key, formData[key]);
             }
         });
 
-        // Add the required op_type
         data.append('op_type', 'Indumentaria');
 
-        // Append files
-        escudoFiles.forEach(file => data.append('escudo_files', file));
-        sponsorFiles.forEach(file => data.append('sponsor_files', file));
-        templateFiles.forEach(file => data.append('template_files', file));
+        escudoFiles.forEach((file) => {
+            data.append('escudo_files', file);
+        });
+        sponsorFiles.forEach((file) => {
+            data.append('sponsor_files', file);
+        });
+        templateFiles.forEach((file) => {
+            data.append('template_files', file);
+        });
 
         onSave(data);
     };
@@ -211,9 +236,9 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
             >
                 {/* === SECCIÓN 1: DATOS DE LA ORDEN === */}
                 <Section title="Datos de la Orden">
-                    <Grid container spacing={2}>
+                    <Grid container spacing={3}>
                         {order && (
-                            <Grid xs={12} sm={6}>
+                            <Grid item xs={12} md={6}>
                                 <TextField
                                     label="ID"
                                     value={order.id || ''}
@@ -224,7 +249,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         )}
                         
                         {creationFlow === 'fromSale' && (
-                            <Grid xs={12} sm={6}>
+                            <Grid item xs={12} md={6}>
                                 <FormControl fullWidth>
                                     <InputLabel>Nota de Pedido Asociada</InputLabel>
                                     <Select
@@ -243,7 +268,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                             </Grid>
                         )}
 
-                        <Grid xs={12} sm={6}>
+                        <Grid item xs={12} md={6}>
                             <TextField
                                 label="Equipo"
                                 name="equipo"
@@ -253,7 +278,21 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                             />
                         </Grid>
 
-                        <Grid xs={12}>
+                        <Grid item xs={12} md={6}>
+                            <TextField
+                                label="Fecha Estimada de Entrega"
+                                name="estimated_delivery_date"
+                                type="date"
+                                value={formData.estimated_delivery_date || ''}
+                                onChange={handleFormChange}
+                                fullWidth
+                                InputLabelProps={{
+                                    shrink: true,
+                                }}
+                            />
+                        </Grid>
+
+                        <Grid item xs={12}>
                             <TextField
                                 label="Detalle del Equipo"
                                 name="detalle_equipo"
@@ -264,13 +303,25 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                                 rows={2}
                             />
                         </Grid>
+
+                        <Grid item xs={12} md={6}>
+                            <TextField
+                                label="Estado"
+                                name="status"
+                                value={formData.status || 'Pendiente'}
+                                onChange={handleFormChange}
+                                fullWidth
+                                disabled
+                            />
+                        </Grid>
                     </Grid>
                 </Section>
+
                 {/* === SECCIÓN 2: DATOS DEL CLIENTE === */}
                 {selectedOrderNote?.sale?.client && (
                     <Section title="Datos del Cliente">
-                        <Grid container spacing={2}>
-                            <Grid xs={12} sm={6}>
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={6}>
                                 <TextField
                                     label="Contacto"
                                     value={selectedOrderNote.sale.client.name || ''}
@@ -278,7 +329,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                                     fullWidth
                                 />
                             </Grid>
-                            <Grid xs={12} sm={6}>
+                            <Grid item xs={12} md={6}>
                                 <TextField
                                     label="DNI/CUIT"
                                     value={selectedOrderNote.sale.client.cuit || ''}
@@ -286,7 +337,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                                     fullWidth
                                 />
                             </Grid>
-                            <Grid xs={12} sm={4}>
+                            <Grid item xs={12} md={4}>
                                 <TextField
                                     label="Dirección"
                                     value={selectedOrderNote.sale.client.address || ''}
@@ -294,7 +345,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                                     fullWidth
                                 />
                             </Grid>
-                            <Grid xs={12} sm={4}>
+                            <Grid item xs={12} md={4}>
                                 <TextField
                                     label="Teléfono"
                                     value={selectedOrderNote.sale.client.phone || ''}
@@ -302,7 +353,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                                     fullWidth
                                 />
                             </Grid>
-                            <Grid xs={12} sm={4}>
+                            <Grid item xs={12} md={4}>
                                 <TextField
                                     label="Email"
                                     value={selectedOrderNote.sale.client.email || ''}
@@ -310,9 +361,18 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                                     fullWidth
                                 />
                             </Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    label="Forma de Envío"
+                                    value={selectedOrderNote.shipping_method || ''}
+                                    disabled
+                                    fullWidth
+                                />
+                            </Grid>
                         </Grid>
                     </Section>
                 )}
+
                 {/* === SECCIÓN 3: DATOS DEL PEDIDO === */}
                 <Section title="Datos del Pedido">
                     <Grid container spacing={3}>
@@ -327,7 +387,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                                 >
                                     {products.map((product) => (
                                         <MenuItem key={product.id} value={product.id}>
-                                            {product.name}
+                                            {product.name} {product.design ? `(Plantilla: ${product.design.name || product.design.id})` : '(Sin plantilla)'}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -353,10 +413,10 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
 
                         <Grid item xs={12} md={6}>
                             <FormControl fullWidth>
-                                <InputLabel>Marca</InputLabel>
+                                <InputLabel>Marca/Sponsor</InputLabel>
                                 <Select
                                     value={formData.customization_details?.marca || ''}
-                                    label="Marca"
+                                    label="Marca/Sponsor"
                                     name="customization_marca"
                                     onChange={handleFormChange}
                                 >
@@ -370,10 +430,58 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
 
                         <Grid item xs={12} md={6}>
                             <FormControl fullWidth>
-                                <InputLabel>Color Tela</InputLabel>
+                                <InputLabel>Número</InputLabel>
+                                <Select
+                                    value={formData.customization_details?.numero || ''}
+                                    label="Número"
+                                    name="customization_numero"
+                                    onChange={handleFormChange}
+                                >
+                                    <MenuItem value="Sublimado">Sublimado</MenuItem>
+                                    <MenuItem value="Vinilo">Vinilo</MenuItem>
+                                    <MenuItem value="No lleva">No lleva</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} md={6}>
+                            <FormControl fullWidth>
+                                <InputLabel>Nombre</InputLabel>
+                                <Select
+                                    value={formData.customization_details?.nombre || ''}
+                                    label="Nombre"
+                                    name="customization_nombre"
+                                    onChange={handleFormChange}
+                                >
+                                    <MenuItem value="Sublimado">Sublimado</MenuItem>
+                                    <MenuItem value="Vinilo">Vinilo</MenuItem>
+                                    <MenuItem value="No lleva">No lleva</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} md={6}>
+                            <FormControl fullWidth>
+                                <InputLabel>Lugar del Nombre</InputLabel>
+                                <Select
+                                    value={formData.customization_details?.lugar_nombre || ''}
+                                    label="Lugar del Nombre"
+                                    name="customization_lugar_nombre"
+                                    onChange={handleFormChange}
+                                >
+                                    <MenuItem value="Arriba del Número">Arriba del Número</MenuItem>
+                                    <MenuItem value="Abajo del Número">Abajo del Número</MenuItem>
+                                    <MenuItem value="No lleva">No lleva</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} md={6}>
+                            <FormControl fullWidth>
+                                <InputLabel>Color de Tela</InputLabel>
                                 <Select
                                     value={formData.customization_details?.color_tela || ''}
-                                    label="Color Tela"
+                                    label="Color de Tela"
                                     name="customization_color_tela"
                                     onChange={handleFormChange}
                                 >
@@ -388,10 +496,10 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
 
                         <Grid item xs={12} md={6}>
                             <FormControl fullWidth>
-                                <InputLabel>Tela</InputLabel>
+                                <InputLabel>Tipo de Tela</InputLabel>
                                 <Select
                                     value={formData.customization_details?.tela || ''}
-                                    label="Tela"
+                                    label="Tipo de Tela"
                                     name="customization_tela"
                                     onChange={handleFormChange}
                                 >
@@ -406,10 +514,10 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
 
                         <Grid item xs={12} md={6}>
                             <FormControl fullWidth>
-                                <InputLabel>Cuello</InputLabel>
+                                <InputLabel>Tipo de Cuello</InputLabel>
                                 <Select
                                     value={formData.customization_details?.cuello || ''}
-                                    label="Cuello"
+                                    label="Tipo de Cuello"
                                     name="customization_cuello"
                                     onChange={handleFormChange}
                                 >
@@ -419,8 +527,101 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                                 </Select>
                             </FormControl>
                         </Grid>
+
+                        {/* Campos adicionales según la especificación */}
+                        <Grid item xs={12} md={6}>
+                            <FormControl fullWidth>
+                                <InputLabel>Color Feston</InputLabel>
+                                <Select
+                                    value={formData.customization_details?.color_feston || ''}
+                                    label="Color Feston"
+                                    name="customization_color_feston"
+                                    onChange={handleFormChange}
+                                >
+                                    {colors.map((color) => (
+                                        <MenuItem key={color.id} value={color.name}>
+                                            {color.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} md={6}>
+                            <FormControl fullWidth>
+                                <InputLabel>Color Marca</InputLabel>
+                                <Select
+                                    value={formData.customization_details?.color_marca || ''}
+                                    label="Color Marca"
+                                    name="customization_color_marca"
+                                    onChange={handleFormChange}
+                                >
+                                    {colors.map((color) => (
+                                        <MenuItem key={color.id} value={color.name}>
+                                            {color.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} md={6}>
+                            <FormControl fullWidth>
+                                <InputLabel>Color TurboDry</InputLabel>
+                                <Select
+                                    value={formData.customization_details?.color_turbodry || ''}
+                                    label="Color TurboDry"
+                                    name="customization_color_turbodry"
+                                    onChange={handleFormChange}
+                                >
+                                    {colors.map((color) => (
+                                        <MenuItem key={color.id} value={color.name}>
+                                            {color.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} md={6}>
+                            <FormControl fullWidth>
+                                <InputLabel>Color Talles</InputLabel>
+                                <Select
+                                    value={formData.customization_details?.color_talles || ''}
+                                    label="Color Talles"
+                                    name="customization_color_talles"
+                                    onChange={handleFormChange}
+                                >
+                                    {colors.map((color) => (
+                                        <MenuItem key={color.id} value={color.name}>
+                                            {color.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} md={6}>
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        checked={formData.customization_details?.tira_limpieza || false}
+                                        onChange={(e) => handleFormChange({
+                                            target: {
+                                                name: 'customization_tira_limpieza',
+                                                value: e.target.checked,
+                                                type: 'checkbox'
+                                            }
+                                        })}
+                                        name="customization_tira_limpieza"
+                                    />
+                                }
+                                label="Tira de Limpieza"
+                            />
+                        </Grid>
                     </Grid>
                 </Section>
+
                 {/* === SECCIÓN 4: DETALLE DEL PEDIDO === */}
                 <Section title="Detalle del Pedido">
                     <TextField
@@ -434,10 +635,11 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         placeholder="Especificaciones especiales, instrucciones de producción, etc."
                     />
                 </Section>
+
                 {/* === SECCIÓN 5: PLANTILLA DE TALLES === */}
                 <Section title="Plantilla de Talles">
-                    <Grid container spacing={2}>
-                        <Grid xs={12} sm={4}>
+                    <Grid container spacing={3}>
+                        <Grid item xs={12} md={3}>
                             <FormControl fullWidth>
                                 <InputLabel>Talle</InputLabel>
                                 <Select
@@ -445,17 +647,25 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                                     label="Talle"
                                     name="size"
                                     onChange={handleCurrentItemChange}
-                                    disabled={!selectedBaseProduct}
+                                    disabled={!selectedBaseProduct || (!selectedBaseProduct.sizes || selectedBaseProduct.sizes.length === 0)}
                                 >
-                                    {selectedBaseProduct?.sizes?.map((size) => (
-                                        <MenuItem key={size.id || size} value={size.name || size}>
-                                            {size.name || size}
+                                    {selectedBaseProduct?.sizes?.length > 0 ? (
+                                        selectedBaseProduct.sizes.map((size) => (
+                                            <MenuItem key={size.id || size.name || size} value={size.name || size}>
+                                                {size.name || size}
+                                            </MenuItem>
+                                        ))
+                                    ) : (
+                                        <MenuItem disabled value="">
+                                            {!selectedBaseProduct 
+                                                ? "Seleccione un producto primero" 
+                                                : "Este producto no tiene talles disponibles"}
                                         </MenuItem>
-                                    )) || []}
+                                    )}
                                 </Select>
                             </FormControl>
                         </Grid>
-                        <Grid xs={12} sm={3}>
+                        <Grid item xs={12} md={3}>
                             <TextField
                                 label="Cantidad"
                                 name="quantity"
@@ -463,9 +673,10 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                                 value={currentItem.quantity}
                                 onChange={handleCurrentItemChange}
                                 fullWidth
+                                inputProps={{ min: 1 }}
                             />
                         </Grid>
-                        <Grid xs={12} sm={3}>
+                        <Grid item xs={12} md={3}>
                             <FormControlLabel
                                 control={
                                     <Checkbox
@@ -474,14 +685,17 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                                         name="is_goalie"
                                     />
                                 }
-                                label="Arquero"
+                                label="Es para Arquero"
+                                sx={{ height: '100%', alignItems: 'center' }}
                             />
                         </Grid>
-                        <Grid xs={12} sm={2}>
+                        <Grid item xs={12} md={3}>
                             <Button
                                 variant="contained"
                                 onClick={handleAddItem}
                                 fullWidth
+                                disabled={!currentItem.size || !currentItem.quantity}
+                                sx={{ height: '56px' }}
                             >
                                 {editingIndex !== null ? 'Actualizar' : 'Agregar'}
                             </Button>
@@ -531,35 +745,35 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         </Box>
                     )}
                 </Section>
-                {/* === SECTION 6: ESCUDOS Y SPONSORS === */}
-                <Grid xs={12}>
-                    <Section title="Escudos y Sponsors">
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={4}>
-                                <Button variant="outlined" component="label" startIcon={<UploadFileIcon />}>
-                                    Agregar Escudo
-                                    <input type="file" hidden multiple onChange={(e) => handleFileChange(e, 'escudo')} ref={escudoInputRef} />
-                                </Button>
-                                {renderFileList(escudoFiles, 'escudo')}
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <Button variant="outlined" component="label" startIcon={<UploadFileIcon />}>
-                                    Agregar Sponsors
-                                    <input type="file" hidden multiple onChange={(e) => handleFileChange(e, 'sponsor')} ref={sponsorInputRef} />
-                                </Button>
-                                {renderFileList(sponsorFiles, 'sponsor')}
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <Button variant="outlined" component="label" startIcon={<UploadFileIcon />}>
-                                    Agregar Template
-                                    <input type="file" hidden multiple onChange={(e) => handleFileChange(e, 'template')} ref={templateInputRef} />
-                                </Button>
-                                {renderFileList(templateFiles, 'template')}
-                            </Grid>
+
+                {/* === SECCIÓN 6: ESCUDOS Y SPONSORS === */}
+                <Section title="Escudos y Sponsors">
+                    <Grid container spacing={2}>
+                        <Grid item xs={12} sm={4}>
+                            <Button variant="outlined" component="label" startIcon={<UploadFileIcon />}>
+                                Agregar Escudo
+                                <input type="file" hidden multiple onChange={(e) => handleFileChange(e, 'escudo')} ref={escudoInputRef} />
+                            </Button>
+                            {renderFileList(escudoFiles, 'escudo')}
                         </Grid>
-                    </Section>
-                </Grid>
+                        <Grid item xs={12} sm={4}>
+                            <Button variant="outlined" component="label" startIcon={<UploadFileIcon />}>
+                                Agregar Sponsors
+                                <input type="file" hidden multiple onChange={(e) => handleFileChange(e, 'sponsor')} ref={sponsorInputRef} />
+                            </Button>
+                            {renderFileList(sponsorFiles, 'sponsor')}
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                            <Button variant="outlined" component="label" startIcon={<UploadFileIcon />}>
+                                Agregar Template
+                                <input type="file" hidden multiple onChange={(e) => handleFileChange(e, 'template')} ref={templateInputRef} />
+                            </Button>
+                            {renderFileList(templateFiles, 'template')}
+                        </Grid>
+                    </Grid>
+                </Section>
             </DialogContent>
+            
             <DialogActions>
                 <Button onClick={onClose}>Cancelar</Button>
                 <Button onClick={handleSave}>Guardar Orden de Producción</Button>

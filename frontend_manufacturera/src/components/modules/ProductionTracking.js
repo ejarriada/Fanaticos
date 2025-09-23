@@ -1,36 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box, Typography, TextField, Button, CircularProgress, Alert, MenuItem, Select, InputLabel, FormControl
 } from '@mui/material';
+import * as api from '../../utils/api';
 
 const ProductionTracking = () => {
     const [selectedProductionOrder, setSelectedProductionOrder] = useState('');
-    const [productionOrders, setProductionOrders] = useState([]); // Mock data for now
-    const [loading, setLoading] = useState(false);
+    const [productionOrders, setProductionOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [orderData, setOrderData] = useState(null);
 
-    // Mock data for production orders
-    const mockProductionOrders = [
-        { id: 1, client: 'Cliente A', product: 'Camiseta', quantity: 100, estimated_delivery: '2025-10-01', salesperson: 'Vendedor 1', op_type: 'Indumentaria' },
-        { id: 2, client: 'Cliente B', product: 'Medias Deportivas', quantity: 200, estimated_delivery: '2025-10-05', salesperson: 'Vendedor 2', op_type: 'Medias' },
-    ];
-
-    // Mock data for process flow
+    // Mock data for process flow - can be replaced with API data later
     const mockProcessFlow = {
         'Indumentaria': ['Corte', 'Costura', 'Sublimación', 'Estampado', 'Bordado', 'Serigrafía', 'Limpieza/Planchado', 'Empaque'],
         'Medias': ['Tejido', 'Costura', 'Limpieza/Planchado', 'Empaque'],
     };
 
     useEffect(() => {
-        // In a real application, fetch production orders from API
-        setProductionOrders(mockProductionOrders);
+        const fetchOrders = async () => {
+            try {
+                setLoading(true);
+                const data = await api.list('/production-orders/');
+                setProductionOrders(Array.isArray(data) ? data : data.results || []);
+                setError(null);
+            } catch (err) {
+                setError('Error al cargar las órdenes de producción.');
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchOrders();
     }, []);
 
     const handleOrderChange = (event) => {
         const orderId = event.target.value;
         setSelectedProductionOrder(orderId);
-        const data = mockProductionOrders.find(order => order.id === orderId);
+        const data = productionOrders.find(order => order.id === orderId);
         setOrderData(data);
     };
 
@@ -43,30 +50,35 @@ const ProductionTracking = () => {
         <Box sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>Seguimiento de Órdenes de Producción</Typography>
 
-            <FormControl fullWidth margin="dense" sx={{ mb: 3 }}>
-                <InputLabel>Seleccionar Orden de Producción</InputLabel>
-                <Select
-                    value={selectedProductionOrder}
-                    label="Seleccionar Orden de Producción"
-                    onChange={handleOrderChange}
-                >
-                    <MenuItem value=""><em>Ninguna</em></MenuItem>
-                    {productionOrders.map((order) => (
-                        <MenuItem key={order.id} value={order.id}>
-                            OP #{order.id} - {order.product} ({order.client})
-                        </MenuItem>
-                    ))}
-                </Select>
-            </FormControl>
+            {loading && <CircularProgress />}
+            {error && <Alert severity="error">{error}</Alert>}
+
+            {!loading && !error && (
+                <FormControl fullWidth margin="dense" sx={{ mb: 3 }}>
+                    <InputLabel>Seleccionar Orden de Producción</InputLabel>
+                    <Select
+                        value={selectedProductionOrder}
+                        label="Seleccionar Orden de Producción"
+                        onChange={handleOrderChange}
+                    >
+                        <MenuItem value=""><em>Ninguna</em></MenuItem>
+                        {productionOrders.map((order) => (
+                            <MenuItem key={order.id} value={order.id}>
+                                OP #{order.id} - {order.base_product?.name || 'N/A'} ({order.order_note?.sale?.client?.name || 'Interna'})
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+            )}
 
             {orderData && (
                 <Box sx={{ mt: 3, p: 3, border: '1px solid #ccc', borderRadius: '4px' }}>
                     <Typography variant="h6">Detalles de la Orden</Typography>
-                    <Typography>Producto: {orderData.product}</Typography>
-                    <Typography>Cliente: {orderData.client}</Typography>
-                    <Typography>Cantidad: {orderData.quantity}</Typography>
-                    <Typography>Fecha Estimada de Entrega: {orderData.estimated_delivery}</Typography>
-                    <Typography>Vendedor: {orderData.salesperson}</Typography>
+                    <Typography>Producto: {orderData.base_product?.name || 'N/A'}</Typography>
+                    <Typography>Cliente: {orderData.order_note?.sale?.client?.name || 'N/A'}</Typography>
+                    <Typography>Cantidad Total: {orderData.items?.reduce((acc, item) => acc + item.quantity, 0) || 0}</Typography>
+                    <Typography>Fecha Estimada de Entrega: {orderData.estimated_delivery_date ? new Date(orderData.estimated_delivery_date).toLocaleDateString() : 'N/A'}</Typography>
+                    <Typography>Vendedor: {orderData.order_note?.sale?.user?.first_name || 'N/A'} {orderData.order_note?.sale?.user?.last_name || ''}</Typography>
                     <Typography>Tipo de OP: {orderData.op_type}</Typography>
 
                     <Typography variant="h6" sx={{ mt: 3 }}>Proceso Actual</Typography>

@@ -33,6 +33,7 @@ import ArticleIcon from '@mui/icons-material/Article';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import GroupIcon from '@mui/icons-material/Group'; // Icon for HR
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn'; // Icon for Accounting/Finance
+import TimelineIcon from '@mui/icons-material/Timeline'; // Icon for Tracking
 
 const Sidebar = ({ open, drawerWidth }) => {
     const modules = [
@@ -41,6 +42,7 @@ const Sidebar = ({ open, drawerWidth }) => {
         { text: 'Remitos', icon: <ReceiptIcon />, path: '/remitos' },
         { text: 'Notas de Pedido', icon: <DescriptionIcon />, path: '/notas-de-pedido' },
         { text: 'Órdenes de Producción', icon: <ProductionQuantityLimitsIcon />, path: '/ordenes-de-produccion' },
+        { text: 'Seguimiento de Producción', icon: <TimelineIcon />, path: '/seguimiento-produccion' },
         { text: 'Órdenes de Corte', icon: <ContentCutIcon />, path: '/cutting-orders' },
         { text: 'Registros de Proceso', icon: <ArticleIcon />, path: '/production-process-logs' },
         { text: 'Inventario', icon: <InventoryIcon />, path: '/inventory' }, // Keep this one, remove others

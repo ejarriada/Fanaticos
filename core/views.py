@@ -82,9 +82,15 @@ class ProductionOrderViewSet(TenantAwareViewSet):
     queryset = ProductionOrder.objects.all()
     serializer_class = ProductionOrderSerializer
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        op_type = self.request.query_params.get('op_type')
+        if op_type:
+            queryset = queryset.filter(op_type=op_type)
+        return queryset
+
     def perform_create(self, serializer):
         tenant = self.get_tenant()
-        serializer.save(tenant=tenant)
 class RawMaterialViewSet(TenantAwareViewSet):
     queryset = RawMaterial.objects.all()
     serializer_class = RawMaterialSerializer

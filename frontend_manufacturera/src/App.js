@@ -29,6 +29,7 @@ import InventarioModule from './components/modules/InventarioModule';
 import RemitosModule from './components/modules/RemitosModule';
 import TestComponent from './components/modules/TestComponent';
 import ClientesModule from './components/modules/ClientesModule';
+import ProductionTracking from './components/modules/ProductionTracking';
 
 const drawerWidth = 240;
 
@@ -117,6 +118,7 @@ function MainApp() {
           <Route path="/materias-primas" element={<PrivateRoute><MateriasPrimasModule /></PrivateRoute>} />
           <Route path="/cutting-orders" element={<PrivateRoute><CuttingOrderManagement /></PrivateRoute>} />
           <Route path="/production-process-logs" element={<PrivateRoute><ProductionProcessLogManagement /></PrivateRoute>} />
+          <Route path="/seguimiento-produccion" element={<PrivateRoute><ProductionTracking /></PrivateRoute>} />
           <Route path="/designs" element={<Navigate to="/products" replace />} />
           <Route path="/products" element={<PrivateRoute><ProductosModule /></PrivateRoute>} />
           <Route path="/inventory" element={<PrivateRoute><InventarioModule /></PrivateRoute>} />

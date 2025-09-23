@@ -320,6 +320,9 @@ class ProductionOrder(TenantAwareModel):
     estimated_delivery_date = models.DateField(null=True, blank=True)
     current_process = models.ForeignKey(Process, on_delete=models.SET_NULL, null=True, blank=True)
     details = models.TextField(blank=True, null=True)
+    colors = models.ManyToManyField(Color, blank=True)
+    specifications = models.CharField(max_length=255, blank=True)
+    model = models.CharField(max_length=255, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.estimated_delivery_date and self.order_note:

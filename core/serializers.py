@@ -349,32 +349,54 @@ class ProductionOrderSerializer(TenantAwareSerializer):
         read_only_fields = ('creation_date',)
 
     def to_internal_value(self, data):
-        # Handle JSON strings in FormData
-        if isinstance(data.get('items'), str):
-            try:
-                data = data.copy() # Make data mutable
-                data['items'] = json.loads(data['items'])
-            except (json.JSONDecodeError, TypeError):
-                raise serializers.ValidationError({"items": "Invalid JSON format."})
-        
-        if isinstance(data.get('customization_details'), str):
-            try:
-                data = data.copy()
-                data['customization_details'] = json.loads(data['customization_details'])
-            except (json.JSONDecodeError, TypeError):
-                raise serializers.ValidationError({"customization_details": "Invalid JSON format."})
+        import json
+        # We're converting the QueryDict to a mutable dict to modify it.
+        mutable_data = data.copy()
 
-        return super().to_internal_value(data)
+        items_str = mutable_data.get('items')
+        if items_str and isinstance(items_str, str):
+            try:
+                mutable_data['items'] = json.loads(items_str)
+            except json.JSONDecodeError:
+                raise serializers.ValidationError({'items': 'Invalid JSON string.'})
+
+        details_str = mutable_data.get('customization_details')
+        if details_str and isinstance(details_str, str):
+            try:
+                mutable_data['customization_details'] = json.loads(details_str)
+            except json.JSONDecodeError:
+                raise serializers.ValidationError({'customization_details': 'Invalid JSON string.'})
+        
+        return super().to_internal_value(mutable_data)
 
     def to_representation(self, instance):
-        """
-        On read, replace the order_note ID with a full nested object.
-        """
         representation = super().to_representation(instance)
-        if instance.order_note:
-            representation['order_note'] = OrderNoteSerializer(instance.order_note, context=self.context).data
-        if instance.base_product: # Also nest base_product
-            representation['base_product'] = SimpleProductSerializer(instance.base_product, context=self.context).data
+        
+        order_note_instance = None
+        base_product_instance = None
+
+        if isinstance(instance, ProductionOrder):
+            order_note_instance = instance.order_note
+            base_product_instance = instance.base_product
+        elif isinstance(instance, dict):
+            order_note_id = instance.get('order_note')
+            base_product_id = instance.get('base_product')
+            if order_note_id:
+                try:
+                    order_note_instance = OrderNote.objects.get(pk=order_note_id)
+                except OrderNote.DoesNotExist:
+                    pass
+            if base_product_id:
+                try:
+                    base_product_instance = Product.objects.get(pk=base_product_id)
+                except Product.DoesNotExist:
+                    pass
+
+        if order_note_instance:
+            representation['order_note'] = OrderNoteSerializer(order_note_instance, context=self.context).data
+        if base_product_instance:
+            representation['base_product'] = SimpleProductSerializer(base_product_instance, context=self.context).data
+            
         return representation
 
     def create(self, validated_data):
@@ -419,7 +441,7 @@ class ProductionOrderSerializer(TenantAwareSerializer):
         return production_order
 
     def update(self, instance, validated_data):
-        items_data = validated_data.pop('items')
+        items_data = validated_data.pop('items', None)
         
         # Pop file lists before calling super().update()
         escudo_files = validated_data.pop('escudo_files', [])
@@ -438,18 +460,21 @@ class ProductionOrderSerializer(TenantAwareSerializer):
         instance.details = validated_data.get('details', instance.details)
         instance.save()
 
-        # Handle the nested items by replacing them.
-        with transaction.atomic():
-            instance.items.all().delete()
-            for item_data in items_data:
-                ProductionOrderItem.objects.create(
-                    production_order=instance,
-                    tenant=instance.tenant,
-                    **item_data
-                )
+        # Handle the nested items only if they were provided
+        if items_data is not None:
+            with transaction.atomic():
+                instance.items.all().delete()
+                for item_data in items_data:
+                    ProductionOrderItem.objects.create(
+                        production_order=instance,
+                        tenant=instance.tenant,
+                        **item_data
+                    )
             
-            # Handle files: delete existing and create new ones
-            instance.files.all().delete() # Delete all existing files
+        # Handle files: delete existing and create new ones
+        # Note: This file handling logic might need adjustment based on desired behavior (e.g., only updating if new files are sent)
+        if escudo_files or sponsor_files or template_files:
+            instance.files.all().delete() # Example: delete all existing files if new ones are uploaded
             for file_obj in escudo_files:
                 ProductionOrderFile.objects.create(
                     production_order=instance,

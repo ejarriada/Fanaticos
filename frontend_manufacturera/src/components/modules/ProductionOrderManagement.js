@@ -1,33 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import {
     Box, Button, Paper, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, IconButton, Typography, CircularProgress, Alert,
-    Dialog, DialogTitle, DialogContent, DialogActions, Stack
+    Dialog, DialogTitle, DialogContent, DialogActions, Stack, FormControl,
+    InputLabel, Select, MenuItem, Grid, ToggleButton, ToggleButtonGroup
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import * as api from '../../utils/api';
 import ProductionOrderFormIndumentaria from './ProductionOrderFormIndumentaria';
-// import ProductionOrderFormMedias from './ProductionOrderFormMedias'; // Keep for later
+import ProductionOrderFormMedias from './ProductionOrderFormMedias';
 
 const ProductionOrderManagement = () => {
     const [productionOrders, setProductionOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const { tenantId } = useAuth();
+    const [opTypeFilter, setOpTypeFilter] = useState('all'); // State for the filter
     
     // State for dialogs and flow control
-    const [isCreationTypeDialogOpen, setCreationTypeDialogOpen] = useState(false);
+    const [isProductTypeDialogOpen, setProductTypeDialogOpen] = useState(false);
     const [isFormOpen, setFormOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
-    const [creationFlow, setCreationFlow] = useState(null); // 'fromSale' or 'internal'
+    const [selectedProductType, setSelectedProductType] = useState('Indumentaria');
+    const [selectedCreationFlow, setSelectedCreationFlow] = useState('fromSale');
 
-    const fetchProductionOrders = async () => {
+    const fetchProductionOrders = async (filter = 'all') => {
         try {
             setLoading(true);
-            const data = await api.list('/production-orders/');
+            let endpoint = '/production-orders/';
+            if (filter !== 'all') {
+                endpoint = `/production-orders/?op_type=${filter}`;
+            }
+            const data = await api.list(endpoint);
             setProductionOrders(Array.isArray(data) ? data : data.results || []);
             setError(null);
         } catch (err) {
@@ -39,44 +44,67 @@ const ProductionOrderManagement = () => {
     };
 
     useEffect(() => {
-        if (tenantId) {
-            fetchProductionOrders();
-        }
-    }, [tenantId]);
+        fetchProductionOrders(opTypeFilter);
+    }, [opTypeFilter]);
 
     const handleNewOrderClick = () => {
         setSelectedOrder(null);
-        setCreationTypeDialogOpen(true);
+        setSelectedProductType('Indumentaria');
+        setSelectedCreationFlow('fromSale');
+        setProductTypeDialogOpen(true);
     };
 
     const handleEditClick = (order) => {
-        // When editing, the flow is determined by the existence of an order note
+        // When editing, set the flow based on the existing order
         const flow = order.order_note ? 'fromSale' : 'internal';
-        setCreationFlow(flow);
+        setSelectedCreationFlow(flow);
         setSelectedOrder(order);
+        setSelectedProductType(order.op_type || 'Indumentaria');
         setFormOpen(true);
     };
 
-    const handleSelectCreationType = (flow) => {
-        setCreationTypeDialogOpen(false);
-        setCreationFlow(flow);
+    const handleStartNewOrder = () => {
+        setProductTypeDialogOpen(false);
         setFormOpen(true);
     };
 
     const handleCloseForms = () => {
         setFormOpen(false);
+        setProductTypeDialogOpen(false);
         setSelectedOrder(null);
-        setCreationFlow(null);
+        setSelectedProductType('Indumentaria');
+        setSelectedCreationFlow('fromSale');
     };
 
     const handleSave = async (formData) => {
         try {
-            if (selectedOrder) {
-                await api.update('/production-orders/', selectedOrder.id, formData);
+            const dataToSend = new FormData();
+            if (formData instanceof FormData) {
+                for (let [key, value] of formData.entries()) {
+                    dataToSend.append(key, value);
+                }
             } else {
-                await api.create('/production-orders/', formData);
+                Object.keys(formData).forEach(key => {
+                    if (typeof formData[key] === 'object' && formData[key] !== null) {
+                        dataToSend.append(key, JSON.stringify(formData[key]));
+                    } else if (formData[key] !== null && formData[key] !== undefined) {
+                        dataToSend.append(key, formData[key]);
+                    }
+                });
             }
-            fetchProductionOrders();
+            
+            dataToSend.append('op_type', selectedProductType);
+            
+            if (selectedOrder) {
+                await api.update('/production-orders/', selectedOrder.id, dataToSend, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
+            } else {
+                await api.create('/production-orders/', dataToSend, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
+            }
+            fetchProductionOrders(opTypeFilter);
             handleCloseForms();
         } catch (err) {
             const errorData = err.response?.data;
@@ -90,7 +118,7 @@ const ProductionOrderManagement = () => {
         if (window.confirm('¿Está seguro de que desea eliminar esta orden de producción?')) {
             try {
                 await api.remove('/production-orders/', id);
-                fetchProductionOrders();
+                fetchProductionOrders(opTypeFilter);
             } catch (err) {
                 setError('Error al eliminar la orden de producción.');
                 console.error(err);
@@ -98,28 +126,67 @@ const ProductionOrderManagement = () => {
         }
     };
 
-    // For now, we only handle Indumentaria form. This can be expanded later.
     const renderForm = () => {
         if (!isFormOpen) return null;
         
-        // We can add logic here to switch between Indumentaria and Medias forms if needed
-        return (
-            <ProductionOrderFormIndumentaria 
-                open={isFormOpen} 
-                onClose={handleCloseForms} 
-                onSave={handleSave} 
-                order={selectedOrder}
-                creationFlow={creationFlow} // Pass the selected flow to the form
-            />
-        );
+        if (selectedProductType === 'Indumentaria') {
+            return (
+                <ProductionOrderFormIndumentaria 
+                    open={isFormOpen} 
+                    onClose={handleCloseForms} 
+                    onSave={handleSave} 
+                    order={selectedOrder}
+                    creationFlow={selectedCreationFlow}
+                />
+            );
+        } else if (selectedProductType === 'Medias') {
+            return (
+                <ProductionOrderFormMedias 
+                    open={isFormOpen} 
+                    onClose={handleCloseForms} 
+                    onSave={handleSave} 
+                    order={selectedOrder}
+                    creationFlow={selectedCreationFlow}
+                />
+            );
+        }
+        
+        return null;
     };
 
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom>Gestión de Órdenes de Producción</Typography>
-            <Button variant="contained" startIcon={<AddIcon />} sx={{ mb: 2 }} onClick={handleNewOrderClick}>
-                Nueva Orden de Producción
-            </Button>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h5" gutterBottom component="div">
+                    Gestión de Órdenes de Producción
+                </Typography>
+                <Button variant="contained" startIcon={<AddIcon />} onClick={handleNewOrderClick}>
+                    Nueva Orden de Producción
+                </Button>
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                <ToggleButtonGroup
+                    value={opTypeFilter}
+                    exclusive
+                    onChange={(event, newFilter) => {
+                        if (newFilter !== null) {
+                            setOpTypeFilter(newFilter);
+                        }
+                    }}
+                    aria-label="Filter by OP Type"
+                >
+                    <ToggleButton value="all" aria-label="all types">
+                        Todos
+                    </ToggleButton>
+                    <ToggleButton value="Indumentaria" aria-label="apparel">
+                        Indumentaria
+                    </ToggleButton>
+                    <ToggleButton value="Medias" aria-label="socks">
+                        Medias
+                    </ToggleButton>
+                </ToggleButtonGroup>
+            </Box>
 
             {loading && <CircularProgress />}
             {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
@@ -167,21 +234,56 @@ const ProductionOrderManagement = () => {
                 </TableContainer>
             )}
 
-            {/* New Creation Type Selection Dialog */}
-            <Dialog open={isCreationTypeDialogOpen} onClose={() => setCreationTypeDialogOpen(false)}>
-                <DialogTitle>¿Cómo deseas crear la Orden de Producción?</DialogTitle>
+            {/* Product Type and Creation Flow Selection Dialog */}
+            <Dialog 
+                open={isProductTypeDialogOpen} 
+                onClose={() => setProductTypeDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>Nueva Orden de Producción</DialogTitle>
                 <DialogContent>
-                    <Stack spacing={2} sx={{ mt: 1, minWidth: 300 }}>
-                        <Button variant="outlined" onClick={() => handleSelectCreationType('fromSale')}>
-                            A partir de una Venta
-                        </Button>
-                        <Button variant="outlined" onClick={() => handleSelectCreationType('internal')}>
-                            Por Decisión Comercial Interna
-                        </Button>
-                    </Stack>
+                    <Grid container spacing={3} sx={{ mt: 1 }}>
+                        <Grid item xs={12}>
+                            <FormControl fullWidth>
+                                <InputLabel>Tipo de Producto</InputLabel>
+                                <Select
+                                    value={selectedProductType}
+                                    label="Tipo de Producto"
+                                    onChange={(e) => setSelectedProductType(e.target.value)}
+                                >
+                                    <MenuItem value="Indumentaria">Indumentaria</MenuItem>
+                                    <MenuItem value="Medias">Medias</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle1" gutterBottom>
+                                ¿Cómo deseas crear la Orden de Producción?
+                            </Typography>
+                            <Stack spacing={2}>
+                                <Button 
+                                    variant={selectedCreationFlow === 'fromSale' ? 'contained' : 'outlined'}
+                                    onClick={() => setSelectedCreationFlow('fromSale')}
+                                >
+                                    A partir de una Venta
+                                </Button>
+                                <Button 
+                                    variant={selectedCreationFlow === 'internal' ? 'contained' : 'outlined'}
+                                    onClick={() => setSelectedCreationFlow('internal')}
+                                >
+                                    Por Decisión Comercial Interna
+                                </Button>
+                            </Stack>
+                        </Grid>
+                    </Grid>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setCreationTypeDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={() => setProductTypeDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleStartNewOrder} variant="contained">
+                        Continuar
+                    </Button>
                 </DialogActions>
             </Dialog>
 
