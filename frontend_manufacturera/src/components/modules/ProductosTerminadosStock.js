@@ -4,33 +4,35 @@ import {
     TableCell, TableContainer, TableHead, TableRow, CircularProgress,
     Alert, IconButton
 } from '@mui/material';
-import TuneIcon from '@mui/icons-material/Tune'; // Icon for adjustments
+import TuneIcon from '@mui/icons-material/Tune';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 
-const ProductosTerminadosStock = ({ onAdjustStock, refreshKey }) => {
-    const [products, setProducts] = useState([]);
+const ProductosTerminadosStock = ({ onAdjustStock, onDelete, onMove, refreshKey }) => {
+    const [inventoryItems, setInventoryItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const { tenantId } = useAuth();
 
     useEffect(() => {
-        const fetchProducts = async () => {
+        const fetchInventory = async () => {
             if (!tenantId) return;
             try {
                 setLoading(true);
-                const data = await api.list('/products/');
+                const data = await api.list('/inventories/');
                 const list = Array.isArray(data) ? data : data.results;
-                setProducts(list || []);
+                setInventoryItems(list || []);
                 setError(null);
             } catch (err) {
-                setError('Error al cargar los productos terminados.');
+                setError('Error al cargar el stock de productos terminados.');
                 console.error(err);
             } finally {
                 setLoading(false);
             }
         };
-        fetchProducts();
+        fetchInventory();
     }, [tenantId, refreshKey]);
 
     if (loading) return <CircularProgress />;
@@ -43,21 +45,27 @@ const ProductosTerminadosStock = ({ onAdjustStock, refreshKey }) => {
                 <Table>
                     <TableHead>
                         <TableRow>
-                            <TableCell>Nombre</TableCell>
-                            <TableCell>Descripción</TableCell>
+                            <TableCell>Producto</TableCell>
+                            <TableCell>Almacén</TableCell>
                             <TableCell>Stock Disponible</TableCell>
                             <TableCell>Acciones</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {products.map((product) => (
-                            <TableRow key={product.id}>
-                                <TableCell>{product.name}</TableCell>
-                                <TableCell>{product.description}</TableCell>
-                                <TableCell>{product.stock}</TableCell>
+                        {inventoryItems.map((item) => (
+                            <TableRow key={item.id}>
+                                <TableCell>{item.product?.name || 'N/A'}</TableCell>
+                                <TableCell>{item.local?.name || 'N/A'}</TableCell>
+                                <TableCell>{item.quantity}</TableCell>
                                 <TableCell>
-                                    <IconButton onClick={() => onAdjustStock(product)} title="Ajustar Stock">
+                                    <IconButton onClick={() => onAdjustStock(item)} title="Ajustar Stock">
                                         <TuneIcon />
+                                    </IconButton>
+                                    <IconButton onClick={() => onMove(item)} title="Transferir Stock">
+                                        <SwapHorizIcon />
+                                    </IconButton>
+                                    <IconButton onClick={() => onDelete(item.id, 'finished')} title="Eliminar Stock">
+                                        <DeleteIcon />
                                     </IconButton>
                                 </TableCell>
                             </TableRow>

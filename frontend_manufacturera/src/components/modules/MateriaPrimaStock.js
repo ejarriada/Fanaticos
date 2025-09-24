@@ -4,33 +4,35 @@ import {
     TableCell, TableContainer, TableHead, TableRow, CircularProgress,
     Alert, IconButton
 } from '@mui/material';
-import TuneIcon from '@mui/icons-material/Tune'; // Icon for adjustments
+import TuneIcon from '@mui/icons-material/Tune';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 
-const MateriaPrimaStock = ({ onAdjustStock, refreshKey }) => {
-    const [rawMaterials, setRawMaterials] = useState([]);
+const MateriaPrimaStock = ({ onAdjustStock, onDelete, onEdit, refreshKey }) => {
+    const [stockItems, setStockItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const { tenantId } = useAuth();
 
     useEffect(() => {
-        const fetchRawMaterials = async () => {
+        const fetchStockItems = async () => {
             if (!tenantId) return;
             try {
                 setLoading(true);
-                const data = await api.list('/raw-materials/');
+                const data = await api.list('/materia-prima-proveedores/');
                 const list = Array.isArray(data) ? data : data.results;
-                setRawMaterials(list || []);
+                setStockItems(list || []);
                 setError(null);
             } catch (err) {
-                setError('Error al cargar la materia prima.');
+                setError('Error al cargar el stock de materia prima.');
                 console.error(err);
             } finally {
                 setLoading(false);
             }
         };
-        fetchRawMaterials();
+        fetchStockItems();
     }, [tenantId, refreshKey]);
 
     if (loading) return <CircularProgress />;
@@ -38,28 +40,36 @@ const MateriaPrimaStock = ({ onAdjustStock, refreshKey }) => {
 
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom>Stock de Materia Prima</Typography>
+            <Typography variant="h5" gutterBottom>Stock de Materia Prima por Proveedor</Typography>
             <TableContainer component={Paper}>
                 <Table>
                     <TableHead>
                         <TableRow>
-                            <TableCell>Nombre</TableCell>
-                            <TableCell>Nro. de Lote</TableCell>
+                            <TableCell>Materia Prima</TableCell>
+                            <TableCell>Proveedor</TableCell>
+                            <TableCell>Costo</TableCell>
                             <TableCell>Stock Actual</TableCell>
-                            <TableCell>Unidad de Medida</TableCell>
+                            <TableCell>Unidad</TableCell>
                             <TableCell>Acciones</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {rawMaterials.map((rm) => (
-                            <TableRow key={rm.id}>
-                                <TableCell>{rm.name}</TableCell>
-                                <TableCell>{rm.batch_number}</TableCell>
-                                <TableCell>{rm.current_stock}</TableCell>
-                                <TableCell>{rm.unit_of_measure}</TableCell>
+                        {stockItems.map((item) => (
+                            <TableRow key={item.id}>
+                                <TableCell>{item.name}</TableCell>
+                                <TableCell>{item.supplier_name}</TableCell>
+                                <TableCell>${parseFloat(item.cost).toFixed(2)}</TableCell>
+                                <TableCell>{item.current_stock}</TableCell>
+                                <TableCell>{item.unit_of_measure}</TableCell>
                                 <TableCell>
-                                    <IconButton onClick={() => onAdjustStock(rm)} title="Ajustar Stock">
+                                    <IconButton onClick={() => onAdjustStock(item)} title="Ajustar Stock">
                                         <TuneIcon />
+                                    </IconButton>
+                                    <IconButton onClick={() => onEdit(item)} title="Editar Costo">
+                                        <EditIcon />
+                                    </IconButton>
+                                    <IconButton onClick={() => onDelete(item.id, 'raw')} title="Eliminar Stock">
+                                        <DeleteIcon />
                                     </IconButton>
                                 </TableCell>
                             </TableRow>

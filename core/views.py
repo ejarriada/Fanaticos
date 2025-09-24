@@ -91,6 +91,79 @@ class ProductionOrderViewSet(TenantAwareViewSet):
 
     def perform_create(self, serializer):
         tenant = self.get_tenant()
+        serializer.save(tenant=tenant)
+
+    @action(detail=True, methods=['post'], url_path='complete-process')
+    def complete_process(self, request, pk=None):
+        production_order = self.get_object()
+        process_name = request.data.get('process_name')
+
+        if not process_name:
+            return Response({'error': 'process_name is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        design = production_order.base_product.design
+        if not design:
+            return Response({'error': 'Production order has no associated design.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            design_process = DesignProcess.objects.get(design=design, process__name=process_name)
+        except DesignProcess.DoesNotExist:
+            return Response({'error': f'Process {process_name} not found in the design for this order.'}, status=status.HTTP_404_NOT_FOUND)
+
+        materials_to_consume = design_process.materials.all()
+        if not materials_to_consume.exists():
+            # If it's the packaging process, still mark as complete and update inventory
+            if process_name == 'Empaque':
+                with transaction.atomic():
+                    self._update_finished_product_inventory(production_order)
+                    production_order.status = 'Completada'
+                    production_order.save()
+                return Response({'message': 'Process Empaque completed. No materials consumed. Inventory updated.'}, status=status.HTTP_200_OK)
+            return Response({'message': f'Process {process_name} completed. No materials were consumed.'}, status=status.HTTP_200_OK)
+
+        with transaction.atomic():
+            for material_in_recipe in materials_to_consume:
+                raw_material = material_in_recipe.raw_material
+                # Calculate total quantity to deduct for the entire production order
+                total_items_quantity = production_order.items.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
+                quantity_to_deduct = material_in_recipe.quantity * total_items_quantity
+
+                # Find a supplier with enough stock
+                supplier_inventory = MateriaPrimaProveedor.objects.filter(
+                    raw_material=raw_material,
+                    current_stock__gte=quantity_to_deduct
+                ).order_by('cost').first() # Simple strategy: use the cheapest supplier with enough stock
+
+                if not supplier_inventory:
+                    raise transaction.TransactionManagementError(
+                        f'Insufficient stock for {raw_material.name}. Required: {quantity_to_deduct}, but no single supplier has enough.'
+                    )
+                
+                # Deduct the stock
+                supplier_inventory.current_stock -= quantity_to_deduct
+                supplier_inventory.save()
+
+            # If the completed process is Empaque, update inventory and order status
+            if process_name == 'Empaque':
+                self._update_finished_product_inventory(production_order)
+                production_order.status = 'Completada'
+                production_order.save()
+
+        return Response({'message': f'Process {process_name} completed and materials deducted successfully.'}, status=status.HTTP_200_OK)
+
+    def _update_finished_product_inventory(self, production_order):
+        factory_local, created = Local.objects.get_or_create(
+            name='Fábrica',
+            tenant=production_order.tenant
+        )
+        for item in production_order.items.all():
+            inventory_item, created = Inventory.objects.get_or_create(
+                product=item.product,
+                local=factory_local,
+                tenant=production_order.tenant
+            )
+            inventory_item.quantity += item.quantity
+            inventory_item.save()
 class RawMaterialViewSet(TenantAwareViewSet):
     queryset = RawMaterial.objects.all()
     serializer_class = RawMaterialSerializer
@@ -198,7 +271,51 @@ class SaleViewSet(TenantAwareViewSet):
     def perform_create(self, serializer):
         serializer.save(tenant=self.get_tenant(), user=self.request.user)
 
-class InventoryViewSet(TenantAwareViewSet): queryset = Inventory.objects.all(); serializer_class = InventorySerializer
+class InventoryViewSet(TenantAwareViewSet):
+    queryset = Inventory.objects.all()
+    serializer_class = InventorySerializer
+
+    @action(detail=True, methods=['post'], url_path='transfer-stock')
+    def transfer_stock(self, request, pk=None):
+        source_inventory = self.get_object()
+        destination_local_id = request.data.get('destination_local_id')
+        quantity_to_transfer = request.data.get('quantity_to_transfer')
+
+        if not destination_local_id or not quantity_to_transfer:
+            return Response({'error': 'destination_local_id and quantity_to_transfer are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            quantity_to_transfer = int(quantity_to_transfer)
+            if quantity_to_transfer <= 0:
+                raise ValueError()
+        except (ValueError, TypeError):
+            return Response({'error': 'quantity_to_transfer must be a positive integer.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if source_inventory.quantity < quantity_to_transfer:
+            return Response({'error': 'Insufficient stock for transfer.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            destination_local = Local.objects.get(id=destination_local_id, tenant=self.get_tenant())
+        except Local.DoesNotExist:
+            return Response({'error': 'Destination warehouse not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        with transaction.atomic():
+            # Decrease stock from source
+            source_inventory.quantity -= quantity_to_transfer
+            source_inventory.save()
+
+            # Get or create destination inventory record and increase stock
+            destination_inventory, created = Inventory.objects.get_or_create(
+                product=source_inventory.product,
+                local=destination_local,
+                tenant=self.get_tenant(),
+                defaults={'quantity': 0}
+            )
+            destination_inventory.quantity += quantity_to_transfer
+            destination_inventory.save()
+
+        return Response({'message': 'Stock transferred successfully.'}, status=status.HTTP_200_OK)
+
 class SupplierViewSet(TenantAwareViewSet): queryset = Supplier.objects.all(); serializer_class = SupplierSerializer
 class PurchaseOrderViewSet(TenantAwareViewSet): queryset = PurchaseOrder.objects.all(); serializer_class = PurchaseOrderSerializer
 class PurchaseOrderItemViewSet(TenantAwareViewSet): queryset = PurchaseOrderItem.objects.all(); serializer_class = PurchaseOrderItemSerializer
@@ -299,7 +416,48 @@ class QuotationViewSet(TenantAwareViewSet):
         return Response(SaleSerializer(sale, context={'request': request}).data, status=status.HTTP_201_CREATED)
 class QuotationItemViewSet(TenantAwareViewSet): queryset = QuotationItem.objects.all(); serializer_class = QuotationItemSerializer
 class StockAdjustmentViewSet(TenantAwareViewSet): queryset = StockAdjustment.objects.all(); serializer_class = StockAdjustmentSerializer
-class DeliveryNoteViewSet(TenantAwareViewSet): queryset = DeliveryNote.objects.all(); serializer_class = DeliveryNoteSerializer
+class DeliveryNoteViewSet(TenantAwareViewSet):
+    queryset = DeliveryNote.objects.all()
+    serializer_class = DeliveryNoteSerializer
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            # First, validate that there is enough stock for all items.
+            factory_local, created = Local.objects.get_or_create(
+                name='Fábrica',
+                tenant=self.get_tenant()
+            )
+            
+            for item_data in serializer.validated_data['items']:
+                product = item_data['product']
+                quantity_to_deduct = item_data['quantity']
+                
+                try:
+                    inventory_item = Inventory.objects.get(
+                        product=product,
+                        local=factory_local,
+                        tenant=self.get_tenant()
+                    )
+                    if inventory_item.quantity < quantity_to_deduct:
+                        raise serializers.ValidationError(
+                            f"Stock insuficiente para el producto {product.name}. Requerido: {quantity_to_deduct}, Disponible: {inventory_item.quantity}."
+                        )
+                except Inventory.DoesNotExist:
+                    raise serializers.ValidationError(
+                        f"No hay registro de inventario para el producto {product.name} en la Fábrica."
+                    )
+
+            # If all validations pass, proceed to create the delivery note and deduct stock.
+            delivery_note = serializer.save(tenant=self.get_tenant())
+            for item in delivery_note.items.all():
+                inventory_item = Inventory.objects.get(
+                    product=item.product,
+                    local=factory_local,
+                    tenant=self.get_tenant()
+                )
+                inventory_item.quantity -= item.quantity
+                inventory_item.save()
+
 
 # Non-tenant-aware or special case ViewSets
 class TenantViewSet(viewsets.ModelViewSet):

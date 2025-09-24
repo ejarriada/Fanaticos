@@ -5,7 +5,6 @@ import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     Dialog, DialogTitle, DialogContent, IconButton, List, ListItem, ListItemText
 } from '@mui/material';
-import QRCode from 'qrcode';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -24,35 +23,21 @@ const ProductionTracking = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [qrCodeUrl, setQrCodeUrl] = useState('');
 
-    // Generar QR cuando cambia la orden seleccionada
+    // Generar QR usando servicio online (sin dependencias adicionales)
     useEffect(() => {
         if (orderData) {
             generateQRCode(orderData.id);
         }
     }, [orderData]);
 
-    const generateQRCode = async (orderId) => {
-        try {
-            const qrData = JSON.stringify({
-                type: 'production_order',
-                id: orderId,
-                timestamp: Date.now()
-            });
-            const qrUrl = await QRCode.toDataURL(qrData, {
-                errorCorrectionLevel: 'M',
-                type: 'image/png',
-                quality: 0.92,
-                margin: 1,
-                color: {
-                    dark: '#000000',
-                    light: '#FFFFFF'
-                },
-                width: 200
-            });
-            setQrCodeUrl(qrUrl);
-        } catch (error) {
-            console.error('Error generando QR:', error);
-        }
+        const generateQRCode = (orderId) => {
+        const qrData = JSON.stringify({
+            type: 'production_order',
+            id: orderId
+        });
+        
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+        setQrCodeUrl(qrUrl);
     };
 
     // Cargar órdenes de producción
@@ -112,9 +97,6 @@ const ProductionTracking = () => {
                 processes.push({ name: 'Estampado', required: true, status: 'pending' });
             }
 
-            // Verificar si hay procesos de serigrafía (esto podría venir de otros campos)
-            // processes.push({ name: 'Serigrafía', required: false, status: 'pending' });
-
             // Procesos finales obligatorios
             processes.push(
                 { name: 'Limpieza/Planchado', required: true, status: 'pending' },
@@ -152,22 +134,43 @@ const ProductionTracking = () => {
         } else {
             setOrderData(null);
             setCurrentProcesses([]);
+            setQrCodeUrl('');
         }
     };
 
-    const handleProcessAction = (processName, action) => {
-        // Aquí implementarías la lógica para iniciar/finalizar proceso
-        // Por ahora solo actualiza el estado local
-        setCurrentProcesses(prev => 
-            prev.map(process => 
-                process.name === processName 
-                    ? { ...process, status: action === 'start' ? 'in_progress' : 'completed' }
-                    : process
-            )
-        );
+    const handleProcessAction = async (processName, action) => {
+        if (action === 'complete') {
+            try {
+                setLoading(true);
+                const response = await api.postAction('/production-orders/', orderData.id, 'complete-process', { process_name: processName });
+                // Update local state only on success
+                setCurrentProcesses(prev => 
+                    prev.map(process => 
+                        process.name === processName 
+                            ? { ...process, status: 'completed' }
+                            : process
+                    )
+                );
+                alert(response.message || 'Proceso completado con éxito.'); // Simple feedback
+            } catch (err) {
+                const errorMsg = err.response?.data?.error || 'Error al actualizar el proceso.';
+                setError(errorMsg);
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        } else if (action === 'start') {
+            // For now, starting a process is only a local state change
+            setCurrentProcesses(prev => 
+                prev.map(process => 
+                    process.name === processName 
+                        ? { ...process, status: 'in_progress' }
+                        : process
+                )
+            );
+        }
         
         console.log(`Proceso ${processName}: ${action}`);
-        // TODO: Enviar al backend el cambio de estado del proceso
     };
 
     const handleFileView = (file) => {
@@ -196,6 +199,8 @@ const ProductionTracking = () => {
         
         const details = Object.entries(customization).filter(([key, value]) => value && value !== 'No lleva');
         
+        if (details.length === 0) return null;
+        
         return (
             <Card sx={{ mt: 2 }}>
                 <CardContent>
@@ -204,10 +209,10 @@ const ProductionTracking = () => {
                         {details.map(([key, value]) => (
                             <Grid item xs={12} sm={6} md={4} key={key}>
                                 <Typography variant="body2" color="textSecondary">
-                                    {key.replace('_', ' ').toUpperCase()}
+                                    {key.replace(/_/g, ' ').toUpperCase()}
                                 </Typography>
                                 <Typography variant="body1" fontWeight="bold">
-                                    {value}
+                                    {typeof value === 'boolean' ? (value ? 'Sí' : 'No') : value}
                                 </Typography>
                             </Grid>
                         ))}
@@ -217,8 +222,50 @@ const ProductionTracking = () => {
         );
     };
 
+    const renderMediasSpecifications = (colors, specifications) => {
+        if (!colors && !specifications) return null;
+        
+        return (
+            <Box sx={{ mt: 2 }}>
+                <Grid container spacing={2}>
+                    {colors && Object.keys(colors).length > 0 && (
+                        <Grid item xs={12} md={6}>
+                            <Card>
+                                <CardContent>
+                                    <Typography variant="h6" gutterBottom>Colores</Typography>
+                                    {Object.entries(colors).filter(([key, value]) => value).map(([key, value]) => (
+                                        <Typography key={key} sx={{ mb: 0.5 }}>
+                                            <strong>{key.charAt(0).toUpperCase() + key.slice(1)}:</strong> {value}
+                                        </Typography>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    )}
+                    {specifications && Object.keys(specifications).length > 0 && (
+                        <Grid item xs={12} md={6}>
+                            <Card>
+                                <CardContent>
+                                    <Typography variant="h6" gutterBottom>Especificaciones Técnicas</Typography>
+                                    {Object.entries(specifications).filter(([key, value]) => value).map(([key, value]) => (
+                                        <Typography key={key} sx={{ mb: 0.5 }}>
+                                            <strong>{key.charAt(0).toUpperCase() + key.slice(1)}:</strong> {value}
+                                        </Typography>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    )}
+                </Grid>
+            </Box>
+        );
+    };
+
     const renderOrderDetails = () => {
         if (!orderData) return null;
+
+        const totalQuantity = orderData.items?.reduce((sum, item) => sum + parseInt(item.quantity || 0), 0) || 0;
+        const quantityUnit = orderData.op_type === 'Medias' ? 'pares' : 'prendas';
 
         return (
             <Box sx={{ mt: 3 }}>
@@ -226,21 +273,41 @@ const ProductionTracking = () => {
                     <Typography variant="h6" gutterBottom>Detalles de la Orden</Typography>
                     <Grid container spacing={2}>
                         <Grid item xs={12} md={6}>
-                            <Typography><strong>Producto:</strong> {orderData.base_product?.name || 'N/A'}</Typography>
-                            <Typography><strong>Cliente:</strong> {orderData.order_note?.sale?.client?.name || 'Decisión Interna'}</Typography>
-                            <Typography><strong>Cantidad Total:</strong> {
-                                orderData.items?.reduce((sum, item) => sum + parseInt(item.quantity || 0), 0) || 0
-                            } {orderData.op_type === 'Medias' ? 'pares' : 'prendas'}</Typography>
-                            <Typography><strong>Fecha Estimada de Entrega:</strong> {
-                                orderData.estimated_delivery_date ? 
-                                    new Date(orderData.estimated_delivery_date).toLocaleDateString() : 
-                                    'N/A'
-                            }</Typography>
+                            <Typography sx={{ mb: 1 }}>
+                                <strong>Producto:</strong> {orderData.base_product?.name || 'N/A'}
+                            </Typography>
+                            <Typography sx={{ mb: 1 }}>
+                                <strong>Cliente:</strong> {orderData.order_note?.sale?.client?.name || 'Decisión Interna'}
+                            </Typography>
+                            <Typography sx={{ mb: 1 }}>
+                                <strong>Cantidad Total:</strong> {totalQuantity} {quantityUnit}
+                            </Typography>
+                            <Typography sx={{ mb: 1 }}>
+                                <strong>Fecha Estimada de Entrega:</strong> {
+                                    orderData.estimated_delivery_date ? 
+                                        new Date(orderData.estimated_delivery_date).toLocaleDateString() : 
+                                        'N/A'
+                                }
+                            </Typography>
                         </Grid>
                         <Grid item xs={12} md={6}>
-                            <Typography><strong>Vendedor:</strong> {orderData.seller?.name || 'N/A'}</Typography>
-                            <Typography><strong>Tipo de OP:</strong> {orderData.op_type}</Typography>
-                            <Typography><strong>Estado:</strong> 
+                            <Typography sx={{ mb: 1 }}>
+                                <strong>Nota de Pedido Asociada:</strong> {orderData.order_note ? `#${orderData.order_note.id}` : 'N/A'}
+                            </Typography>
+                            <Typography sx={{ mb: 1 }}>
+                                <strong>Vendedor:</strong> {orderData.order_note?.sale?.user?.first_name || 'N/A'}
+                            </Typography>
+                            <Typography sx={{ mb: 1 }}>
+                                <strong>Tipo de OP:</strong> 
+                                <Chip 
+                                    label={orderData.op_type} 
+                                    color="primary" 
+                                    size="small" 
+                                    sx={{ ml: 1 }}
+                                />
+                            </Typography>
+                            <Typography sx={{ mb: 1 }}>
+                                <strong>Estado:</strong>
                                 <Chip 
                                     label={orderData.status} 
                                     color={orderData.status === 'Pendiente' ? 'warning' : 'info'}
@@ -251,6 +318,23 @@ const ProductionTracking = () => {
                         </Grid>
                     </Grid>
 
+                    {/* Detalles específicos para Medias */}
+                    {orderData.op_type === 'Medias' && orderData.model && (
+                        <Box sx={{ mt: 2 }}>
+                            <Typography>
+                                <strong>Modelo:</strong> {orderData.model}
+                            </Typography>
+                        </Box>
+                    )}
+
+                    {/* Detalles adicionales */}
+                    {orderData.details && (
+                        <Box sx={{ mt: 2 }}>
+                            <Typography variant="subtitle1" fontWeight="bold">Detalles Adicionales:</Typography>
+                            <Typography>{orderData.details}</Typography>
+                        </Box>
+                    )}
+
                     {/* Detalles de Talles */}
                     {orderData.items && orderData.items.length > 0 && (
                         <Box sx={{ mt: 3 }}>
@@ -259,10 +343,10 @@ const ProductionTracking = () => {
                                 <Table size="small">
                                     <TableHead>
                                         <TableRow>
-                                            <TableCell>Talle</TableCell>
-                                            <TableCell>Cantidad</TableCell>
-                                            {orderData.op_type === 'Indumentaria' && <TableCell>Arquero</TableCell>}
-                                            {orderData.op_type === 'Medias' && <TableCell>Detalle</TableCell>}
+                                            <TableCell><strong>Talle</strong></TableCell>
+                                            <TableCell><strong>Cantidad</strong></TableCell>
+                                            {orderData.op_type === 'Indumentaria' && <TableCell><strong>Arquero</strong></TableCell>}
+                                            {orderData.op_type === 'Medias' && <TableCell><strong>Detalle</strong></TableCell>}
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
@@ -284,57 +368,39 @@ const ProductionTracking = () => {
                         </Box>
                     )}
 
-                    {/* Especificaciones de Personalización */}
-                    {orderData.customization_details && renderCustomizationDetails(orderData.customization_details)}
+                    {/* Especificaciones según tipo de OP */}
+                    {orderData.op_type === 'Indumentaria' && orderData.customization_details && 
+                        renderCustomizationDetails(orderData.customization_details)
+                    }
+                    
+                    {orderData.op_type === 'Medias' && 
+                        renderMediasSpecifications(orderData.colors, orderData.specifications)
+                    }
 
-                    {/* Especificaciones para Medias */}
-                    {orderData.op_type === 'Medias' && (orderData.colors || orderData.specifications) && (
-                        <Box sx={{ mt: 2 }}>
-                            <Grid container spacing={2}>
-                                {orderData.colors && (
-                                    <Grid item xs={12} md={6}>
-                                        <Card>
-                                            <CardContent>
-                                                <Typography variant="h6" gutterBottom>Colores</Typography>
-                                                {Object.entries(orderData.colors).map(([key, value]) => (
-                                                    <Typography key={key}>
-                                                        <strong>{key.charAt(0).toUpperCase() + key.slice(1)}:</strong> {value}
-                                                    </Typography>
-                                                ))}
-                                            </CardContent>
-                                        </Card>
-                                    </Grid>
-                                )}
-                                {orderData.specifications && (
-                                    <Grid item xs={12} md={6}>
-                                        <Card>
-                                            <CardContent>
-                                                <Typography variant="h6" gutterBottom>Especificaciones Técnicas</Typography>
-                                                {Object.entries(orderData.specifications).map(([key, value]) => (
-                                                    <Typography key={key}>
-                                                        <strong>{key.charAt(0).toUpperCase() + key.slice(1)}:</strong> {value}
-                                                    </Typography>
-                                                ))}
-                                            </CardContent>
-                                        </Card>
-                                    </Grid>
-                                )}
-                            </Grid>
-                        </Box>
-                    )}
-
-                    {/* Archivos de Moldería */}
+                    {/* Archivos de Moldería y Diseño */}
                     {orderData.files && orderData.files.length > 0 && (
                         <Box sx={{ mt: 3 }}>
                             <Typography variant="h6" gutterBottom>Archivos de Moldería y Diseño</Typography>
                             <List>
                                 {orderData.files.map((file, index) => (
-                                    <ListItem key={index} sx={{ border: '1px solid #eee', mb: 1, borderRadius: 1 }}>
+                                    <ListItem 
+                                        key={index} 
+                                        sx={{ 
+                                            border: '1px solid #eee', 
+                                            mb: 1, 
+                                            borderRadius: 1,
+                                            bgcolor: 'grey.50'
+                                        }}
+                                    >
                                         <ListItemText 
                                             primary={file.file?.split('/').pop() || `Archivo ${index + 1}`}
                                             secondary={`Tipo: ${file.file_type || 'General'}`}
                                         />
-                                        <IconButton onClick={() => handleFileView(file)} color="primary">
+                                        <IconButton 
+                                            onClick={() => handleFileView(file)} 
+                                            color="primary"
+                                            title="Ver archivo"
+                                        >
                                             <VisibilityIcon />
                                         </IconButton>
                                         <IconButton 
@@ -342,6 +408,7 @@ const ProductionTracking = () => {
                                             href={file.file} 
                                             target="_blank" 
                                             color="primary"
+                                            title="Descargar archivo"
                                         >
                                             <DownloadIcon />
                                         </IconButton>
@@ -355,6 +422,9 @@ const ProductionTracking = () => {
 
                     {/* Procesos de Producción */}
                     <Typography variant="h6" gutterBottom>Proceso Actual</Typography>
+                    <Typography variant="body2" color="textSecondary" gutterBottom>
+                        Haz clic en cada proceso para marcar inicio/finalización
+                    </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
                         {currentProcesses.map((process, index) => (
                             <Button
@@ -368,7 +438,7 @@ const ProductionTracking = () => {
                                     process.status === 'in_progress' ? 'complete' : 'view'
                                 )}
                                 disabled={process.status === 'completed'}
-                                sx={{ minWidth: 140 }}
+                                sx={{ minWidth: 160, height: 48 }}
                             >
                                 {process.name}
                             </Button>
@@ -381,7 +451,7 @@ const ProductionTracking = () => {
                         <Typography variant="body2" color="textSecondary" gutterBottom>
                             Código QR para seguimiento en puestos de trabajo - OP #{orderData.id}
                         </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
                             {qrCodeUrl ? (
                                 <img 
                                     src={qrCodeUrl} 
@@ -411,17 +481,17 @@ const ProductionTracking = () => {
                                 </Box>
                             )}
                             <Box>
-                                <Typography variant="body2" color="textSecondary">
-                                    Datos del QR:
+                                <Typography variant="body2" color="textSecondary" gutterBottom>
+                                    QR para lectura en puestos de trabajo:
                                 </Typography>
-                                <Typography variant="body2" fontFamily="monospace">
+                                <Typography variant="body2" fontFamily="monospace" sx={{ display: 'block', mb: 0.5 }}>
                                     Tipo: production_order
                                 </Typography>
-                                <Typography variant="body2" fontFamily="monospace">
+                                <Typography variant="body2" fontFamily="monospace" sx={{ display: 'block', mb: 0.5 }}>
                                     ID: {orderData.id}
                                 </Typography>
-                                <Typography variant="body2" fontFamily="monospace">
-                                    Timestamp: {new Date().toLocaleString()}
+                                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                                    Cada puesto escanea este QR para registrar inicio/fin de su proceso
                                 </Typography>
                             </Box>
                         </Box>
@@ -471,7 +541,7 @@ const ProductionTracking = () => {
                             <Typography gutterBottom>
                                 {selectedFile.file?.split('/').pop()}
                             </Typography>
-                            {selectedFile.file?.endsWith('.pdf') ? (
+                            {selectedFile.file?.toLowerCase().endsWith('.pdf') ? (
                                 <embed 
                                     src={selectedFile.file} 
                                     width="100%" 

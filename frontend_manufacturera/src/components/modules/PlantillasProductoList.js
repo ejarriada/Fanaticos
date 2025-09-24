@@ -223,7 +223,7 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
 
     const addRecipeItem = (type) => {
         const newItem = type === 'materials'
-            ? { raw_material: '', quantity: '', raw_material_cost: 0 }
+            ? { raw_material: '', quantity: '', process: '', raw_material_cost: 0 }
             : { process: '', order: formData.processes.length + 1, process_cost: 0 };
         setFormData(prev => ({ ...prev, [type]: [...prev[type], newItem] }));
     };
@@ -250,6 +250,9 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
             submissionData.append(`materials[${index}]raw_material`, m.raw_material);
             submissionData.append(`materials[${index}]quantity`, parseFloat(m.quantity));
             submissionData.append(`materials[${index}]cost`, parseFloat(m.unit_cost));
+            if (m.process) {
+                submissionData.append(`materials[${index}]process`, m.process);
+            }
         });
 
         formData.processes.forEach((p, index) => {
@@ -344,7 +347,7 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
     }
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg"> {/* Changed to lg */}
             <DialogTitle>{product ? 'Editar Plantilla de Producto' : 'Nueva Plantilla de Producto'}</DialogTitle>
             <DialogContent>
                 <TextField margin="dense" name="name" label="Nombre" type="text" fullWidth value={formData.name} onChange={handleFormChange} />
@@ -424,8 +427,8 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                 <Typography sx={{ mt: 2, mb: 1 }}>Receta de Materiales</Typography>
                 <Stack spacing={2}>
                     {formData.materials.map((material, index) => (
-                        <Grid container spacing={2} key={index} alignItems="center">
-                            <Grid item xs={4}>
+                        <Grid container spacing={1} key={index} alignItems="center">
+                            <Grid item xs={12} sm={3}>
                                 <FormControl fullWidth>
                                     <InputLabel>Materia Prima</InputLabel>
                                     <Select value={material.raw_material} onChange={(e) => handleRecipeChange('materials', index, 'raw_material', e.target.value)}>
@@ -433,13 +436,25 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                                     </Select>
                                 </FormControl>
                             </Grid>
-                            <Grid item xs={3}>
+                            <Grid item xs={12} sm={3}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Proceso</InputLabel>
+                                    <Select value={material.process || ''} onChange={(e) => handleRecipeChange('materials', index, 'process', e.target.value)}>
+                                        <MenuItem value=""><em>Ninguno</em></MenuItem>
+                                        {formData.processes.map(p => {
+                                            const process = processes.find(proc => proc.id === p.process);
+                                            return process ? <MenuItem key={process.id} value={process.id}>{process.name}</MenuItem> : null;
+                                        })}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} sm={2}>
                                 <TextField label="Cantidad" type="number" fullWidth value={material.quantity} onChange={(e) => handleRecipeChange('materials', index, 'quantity', e.target.value)} />
                             </Grid>
-                            <Grid item xs={3}>
+                            <Grid item xs={12} sm={2}>
                                 <TextField label="Costo Total" type="text" fullWidth value={material.raw_material_cost} InputProps={{ readOnly: true }} />
                             </Grid>
-                            <Grid item xs={2}>
+                            <Grid item xs={12} sm={2}>
                                 <IconButton onClick={() => removeRecipeItem('materials', index)}><DeleteIcon /></IconButton>
                             </Grid>
                         </Grid>

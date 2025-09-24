@@ -30,6 +30,11 @@ export const patch = async (endpoint, id, data, config = {}) => {
     return response.data;
 };
 
+export const postAction = async (endpoint, id, action, data, config = {}) => {
+    const response = await axiosInstance.post(`${endpoint}${id}/${action}/`, data, config);
+    return response.data;
+};
+
 
 // Dashboard-specific functions
 export const fetchProductionVolume = async () => {

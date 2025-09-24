@@ -99,17 +99,6 @@ class DesignFile(TenantAwareModel):
     def __str__(self):
         return f"File for {self.design.name}"
 
-
-class DesignMaterial(TenantAwareModel):
-    """ Modelo intermedio para la receta de un Diseño: Materias Primas """
-    design = models.ForeignKey(Design, on_delete=models.CASCADE)
-    raw_material = models.ForeignKey(RawMaterial, on_delete=models.CASCADE)
-    quantity = models.DecimalField(max_digits=10, decimal_places=2, help_text="Cantidad de materia prima necesaria para el diseño.")
-    cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Costo unitario de la materia prima en el momento del diseño.") # NEW FIELD
-
-    class Meta:
-        unique_together = ('design', 'raw_material', 'tenant')
-
 class DesignProcess(TenantAwareModel):
     """ Modelo intermedio para la receta de un Diseño: Procesos """
     design = models.ForeignKey(Design, on_delete=models.CASCADE)
@@ -120,6 +109,17 @@ class DesignProcess(TenantAwareModel):
     class Meta:
         unique_together = ('design', 'process', 'tenant')
         ordering = ['order']
+
+class DesignMaterial(TenantAwareModel):
+    """ Modelo intermedio para la receta de un Diseño: Materias Primas """
+    design = models.ForeignKey(Design, on_delete=models.CASCADE)
+    raw_material = models.ForeignKey(RawMaterial, on_delete=models.CASCADE)
+    process = models.ForeignKey(DesignProcess, on_delete=models.SET_NULL, null=True, blank=True, related_name='materials', help_text="Proceso en el que se consume este material.")
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, help_text="Cantidad de materia prima necesaria para el diseño.")
+    cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Costo unitario de la materia prima en el momento del diseño.") # NEW FIELD
+
+    class Meta:
+        unique_together = ('design', 'raw_material', 'tenant')
 
 class Category(TenantAwareModel):
     name = models.CharField(max_length=100, unique=True)
