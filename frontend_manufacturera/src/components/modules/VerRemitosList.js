@@ -1,103 +1,183 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box, Typography, Button, CircularProgress,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
+    Box, Typography, Button, CircularProgress, Alert, Paper, 
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+    FormControl, InputLabel, Select, MenuItem, Chip, IconButton
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-import { listRemitos } from '../../utils/api';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import * as api from '../../utils/api';
 
 const VerRemitosList = () => {
-  const navigate = useNavigate();
-  const [remitos, setRemitos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+    const [remitos, setRemitos] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [filtroTipo, setFiltroTipo] = useState('');
 
-  useEffect(() => {
+    useEffect(() => {
+        fetchRemitos();
+    }, []);
+
     const fetchRemitos = async () => {
-      try {
-        const data = await listRemitos();
-        setRemitos(data);
-      } catch (err) {
-        setError('Error al cargar los remitos.');
-        console.error('Error fetching remitos:', err);
-      } finally {
-        setLoading(false);
-      }
+        try {
+            setLoading(true);
+            const data = await api.list('/delivery-notes/');
+            setRemitos(data.results || data || []);
+            setError(null);
+        } catch (err) {
+            setError('Error al cargar los remitos.');
+            console.error('Error fetching remitos:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    fetchRemitos();
-  }, []);
+    const handleDelete = async (id) => {
+        if (window.confirm('¿Está seguro de que desea eliminar este remito?')) {
+            try {
+                await api.remove('/delivery-notes/', id);
+                fetchRemitos(); // Recargar la lista
+            } catch (err) {
+                setError('Error al eliminar el remito.');
+                console.error(err);
+            }
+        }
+    };
 
-  const handleCreateRemito = () => {
-    navigate('/remitos/crear');
-  };
+    const getEstadoColor = (estado) => {
+        switch (estado?.toLowerCase()) {
+            case 'pendiente': return 'warning';
+            case 'enviado': return 'info';
+            case 'entregado': return 'success';
+            case 'cancelado': return 'error';
+            default: return 'default';
+        }
+    };
 
-  const handleEditRemito = (id) => {
-    navigate(`/remitos/editar/${id}`);
-  };
+    const remitosFiltrados = filtroTipo 
+        ? remitos.filter(remito => remito.tipo === filtroTipo)
+        : remitos;
 
-  const handleDeleteRemito = async (id) => {
-    // Implement delete logic here
-    console.log('Delete remito with ID:', id);
-    // After successful deletion, refetch remitos or remove from state
-  };
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
 
-  if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+        <Box sx={{ p: 3 }}>
+            {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
+            
+            {/* Filtros */}
+            <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+                <FormControl sx={{ minWidth: 200 }}>
+                    <InputLabel>Filtrar por Tipo</InputLabel>
+                    <Select
+                        value={filtroTipo}
+                        label="Filtrar por Tipo"
+                        onChange={(e) => setFiltroTipo(e.target.value)}
+                    >
+                        <MenuItem value="">Todos</MenuItem>
+                        <MenuItem value="Venta">Venta</MenuItem>
+                        <MenuItem value="Interno">Interno</MenuItem>
+                    </Select>
+                </FormControl>
+                <Typography variant="body2" color="textSecondary">
+                    Total: {remitosFiltrados.length} remitos
+                </Typography>
+            </Box>
 
-  if (error) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography color="error">{error}</Typography>
-      </Box>
+            <TableContainer component={Paper}>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell><strong>ID</strong></TableCell>
+                            <TableCell><strong>Tipo</strong></TableCell>
+                            <TableCell><strong>Fecha</strong></TableCell>
+                            <TableCell><strong>Cliente</strong></TableCell>
+                            <TableCell><strong>Origen</strong></TableCell>
+                            <TableCell><strong>Destino</strong></TableCell>
+                            <TableCell><strong>Estado</strong></TableCell>
+                            <TableCell><strong>Acciones</strong></TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {remitosFiltrados.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={8} align="center">
+                                    <Typography variant="body2" color="textSecondary">
+                                        No hay remitos para mostrar
+                                    </Typography>
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            remitosFiltrados.map((remito) => (
+                                <TableRow key={remito.id}>
+                                    <TableCell>{remito.id}</TableCell>
+                                    <TableCell>
+                                        <Chip 
+                                            label={remito.tipo || 'N/A'} 
+                                            color={remito.tipo === 'Venta' ? 'primary' : 'secondary'}
+                                            size="small"
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        {remito.fecha ? new Date(remito.fecha).toLocaleDateString() : 'N/A'}
+                                    </TableCell>
+                                    <TableCell>
+                                        {remito.tipo === 'Venta' 
+                                            ? (remito.cliente?.name || 'N/A')
+                                            : '-'
+                                        }
+                                    </TableCell>
+                                    <TableCell>
+                                        {remito.origen?.name || remito.origen || 'N/A'}
+                                    </TableCell>
+                                    <TableCell>
+                                        {remito.destino?.name || remito.destino || 'N/A'}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Chip 
+                                            label={remito.estado || 'Pendiente'} 
+                                            color={getEstadoColor(remito.estado)}
+                                            size="small"
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <IconButton 
+                                            size="small" 
+                                            color="primary"
+                                            title="Ver detalles"
+                                        >
+                                            <VisibilityIcon />
+                                        </IconButton>
+                                        <IconButton 
+                                            size="small" 
+                                            color="primary"
+                                            title="Editar"
+                                        >
+                                            <EditIcon />
+                                        </IconButton>
+                                        <IconButton 
+                                            size="small" 
+                                            color="error"
+                                            onClick={() => handleDelete(remito.id)}
+                                            title="Eliminar"
+                                        >
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+        </Box>
     );
-  }
-
-  return (
-    <Box sx={{ p: 3 }}>
-      <TableContainer component={Paper}>
-        <Table sx={{ minWidth: 650 }} aria-label="simple table">
-          <TableHead>
-            <TableRow>
-              <TableCell>Número</TableCell>
-              <TableCell>Tipo</TableCell>
-              <TableCell>Fecha</TableCell>
-              <TableCell>Cliente/Origen</TableCell>
-              <TableCell>Acciones</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {remitos.map((remito) => (
-              <TableRow
-                key={remito.id}
-                sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-              >
-                <TableCell component="th" scope="row">
-                  {remito.numero}
-                </TableCell>
-                <TableCell>{remito.tipo}</TableCell>
-                <TableCell>{remito.fecha}</TableCell>
-                <TableCell>{remito.tipo === 'venta' ? remito.cliente_nombre : remito.origen_nombre}</TableCell>
-                <TableCell>
-                  <Button variant="outlined" size="small" onClick={() => handleEditRemito(remito.id)} sx={{ mr: 1 }}>
-                    Editar
-                  </Button>
-                  <Button variant="outlined" color="error" size="small" onClick={() => handleDeleteRemito(remito.id)}>
-                    Eliminar
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
-  );
 };
 
 export default VerRemitosList;
