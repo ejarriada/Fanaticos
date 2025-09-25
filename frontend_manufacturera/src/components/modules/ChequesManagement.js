@@ -160,7 +160,7 @@ const ChequesManagement = () => {
     const fetchCheques = async () => {
         try {
             setLoading(true);
-            const data = await api.list('/cheques/'); // Assuming a /cheques/ endpoint
+            const data = await api.list('/checks/'); // Corrected endpoint
             const chequeList = Array.isArray(data) ? data : data.results;
             setCheques(chequeList || []);
             setError(null);
@@ -196,9 +196,9 @@ const ChequesManagement = () => {
             };
 
             if (selectedCheque) {
-                await api.update('/cheques/', selectedCheque.id, dataToSend);
+                await api.update('/checks/', selectedCheque.id, dataToSend);
             } else {
-                await api.create('/cheques/', dataToSend);
+                await api.create('/checks/', dataToSend);
             }
             fetchCheques(); // Refresh list
             handleCloseForm();
@@ -215,7 +215,7 @@ const ChequesManagement = () => {
     const handleDelete = async (id) => {
         if (window.confirm('¿Está seguro de que desea eliminar este cheque?')) {
             try {
-                await api.remove('/cheques/', id);
+                await api.remove('/checks/', id);
                 fetchCheques(); // Refresh list
             } catch (err) {
                 setError('Error al eliminar el cheque.');

@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
-import { Box, Tabs, Tab, Typography } from '@mui/material';
-
-// Import HR sub-modules
-import EmployeeRoleManagement from './EmployeeRoleManagement';
+import { Box, Tabs, Tab, Paper, Typography } from '@mui/material';
 import EmployeeManagement from './EmployeeManagement';
 import SalaryManagement from './SalaryManagement';
-import PermitManagement from './PermitManagement';
 import VacationManagement from './VacationManagement';
+import PermitManagement from './PermitManagement';
 import MedicalRecordManagement from './MedicalRecordManagement';
+import AbsencesManagement from './AbsencesManagement';
 
+// Panel de Pestañas (TabPanel) para asociar contenido a cada pestaña
 function TabPanel(props) {
     const { children, value, index, ...other } = props;
 
@@ -16,64 +15,58 @@ function TabPanel(props) {
         <div
             role="tabpanel"
             hidden={value !== index}
-            id={`simple-tabpanel-${index}`}
-            aria-labelledby={`simple-tab-${index}`}
+            id={`hr-tabpanel-${index}`}
+            aria-labelledby={`hr-tab-${index}`}
             {...other}
         >
             {value === index && (
                 <Box sx={{ p: 3 }}>
-                    <Typography>{children}</Typography>
+                    {children}
                 </Box>
             )}
         </div>
     );
 }
 
-function a11yProps(index) {
-    return {
-        id: `simple-tab-${index}`,
-        'aria-controls': `simple-tabpanel-${index}`,
-    };
-}
-
 const HumanResourcesModule = () => {
-    const [value, setValue] = useState(0);
+    const [currentTab, setCurrentTab] = useState(0);
 
-    const handleChange = (event, newValue) => {
-        setValue(newValue);
+    const handleTabChange = (event, newValue) => {
+        setCurrentTab(newValue);
     };
 
     return (
-        <Box sx={{ width: '100%' }}>
+        <Paper sx={{ width: '100%' }}>
+            <Typography variant="h4" sx={{ p: 3, pb: 1 }}>Módulo de Recursos Humanos</Typography>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs value={value} onChange={handleChange} aria-label="HR tabs">
-                    <Tab label="Roles de Empleado" {...a11yProps(0)} />
-                    <Tab label="Empleados" {...a11yProps(1)} />
-                    <Tab label="Salarios" {...a11yProps(2)} />
-                    <Tab label="Permisos" {...a11yProps(3)} />
-                    <Tab label="Vacaciones" {...a11yProps(4)} />
-                    <Tab label="Historial Médico" {...a11yProps(5)} />
+                <Tabs value={currentTab} onChange={handleTabChange} aria-label="Módulos de Recursos Humanos" variant="scrollable" scrollButtons="auto">
+                    <Tab label="Empleados" id="hr-tab-0" />
+                    <Tab label="Salarios" id="hr-tab-1" />
+                    <Tab label="Vacaciones" id="hr-tab-2" />
+                    <Tab label="Permisos" id="hr-tab-3" />
+                    <Tab label="Carpetas Médicas" id="hr-tab-4" />
+                    <Tab label="Ausencias" id="hr-tab-5" />
                 </Tabs>
             </Box>
-            <TabPanel value={value} index={0}>
-                <EmployeeRoleManagement />
-            </TabPanel>
-            <TabPanel value={value} index={1}>
+            <TabPanel value={currentTab} index={0}>
                 <EmployeeManagement />
             </TabPanel>
-            <TabPanel value={value} index={2}>
+            <TabPanel value={currentTab} index={1}>
                 <SalaryManagement />
             </TabPanel>
-            <TabPanel value={value} index={3}>
-                <PermitManagement />
-            </TabPanel>
-            <TabPanel value={value} index={4}>
+            <TabPanel value={currentTab} index={2}>
                 <VacationManagement />
             </TabPanel>
-            <TabPanel value={value} index={5}>
+            <TabPanel value={currentTab} index={3}>
+                <PermitManagement />
+            </TabPanel>
+            <TabPanel value={currentTab} index={4}>
                 <MedicalRecordManagement />
             </TabPanel>
-        </Box>
+            <TabPanel value={currentTab} index={5}>
+                <AbsencesManagement />
+            </TabPanel>
+        </Paper>
     );
 };
 

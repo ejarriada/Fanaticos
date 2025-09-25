@@ -15,9 +15,29 @@ const FinancialSummary = () => {
     const fetchSummary = async () => {
         try {
             setLoading(true);
-            // Assuming an API endpoint like /financial-summary/?month=YYYY-MM
-            const data = await api.get(`/financial-summary/?month=${month}`);
-            setSummaryData(data);
+            
+            // Perform multiple API calls in parallel
+            const [balanceData, profitLossData, revenueExpensesData] = await Promise.all([
+                api.list(`/management/current-balance/?month=${month}`),
+                api.list(`/management/overall-profit-loss/?month=${month}`),
+                api.list(`/management/revenue-expenses/?month=${month}`)
+            ]);
+
+            // Combine the results into a single summary object
+            const combinedData = {
+                cash_balance: balanceData.cash_register_balances?.reduce((acc, cur) => acc + cur.balance, 0),
+                client_debt: balanceData.account_balances?.find(acc => acc.account__name === 'Cuentas por Cobrar')?.balance || 0,
+                supplier_debt: balanceData.account_balances?.find(acc => acc.account__name === 'Cuentas por Pagar')?.balance || 0,
+                overall_profit_loss: profitLossData.overall_profit_loss,
+                total_revenue: revenueExpensesData.total_revenue,
+                total_expenses: revenueExpensesData.total_expenses,
+                // These might need their own endpoints or be derived differently
+                third_party_cheques_balance: 0, 
+                own_cheques_balance: 0,
+                net_result: profitLossData.overall_profit_loss, // Or calculate from revenue/expenses
+            };
+
+            setSummaryData(combinedData);
             setError(null);
         } catch (err) {
             setError('Error al cargar el resumen financiero.');

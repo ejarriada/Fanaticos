@@ -1,20 +1,17 @@
 import React, { useState } from 'react';
 import { Box, Tab, Tabs, Typography } from '@mui/material';
 
-// Placeholders for the components
+// Import all necessary components
 import CashRegisterManagement from './CashRegisterManagement';
-
 import ExpenseManagement from './ExpenseManagement';
-
 import ChequesManagement from './ChequesManagement';
-
 import FinancialSummary from './FinancialSummary';
-
-import ExpenseSummary from './ExpenseSummary';
-
 import PaymentRules from './PaymentRules';
-
-import BankManagement from './BankManagement';
+import InvoiceManagement from './InvoiceManagement';
+import PaymentManagement from './PaymentManagement';
+import AccountManagement from './AccountManagement';
+import PaymentMethodTypeManagement from './PaymentMethodTypeManagement';
+import BancosHub from './BancosHub'; // Hub for Bank and Bank Statements
 
 function TabPanel(props) {
     const { children, value, index, ...other } = props;
@@ -28,7 +25,7 @@ function TabPanel(props) {
             {...other}
         >
             {value === index && (
-                <Box>
+                <Box sx={{ p: 3 }}>
                     {children}
                 </Box>
             )}
@@ -45,38 +42,50 @@ const FinanzasModule = () => {
 
     return (
         <Box sx={{ width: '100%' }}>
-            <Typography variant="h4" sx={{ mb: 3 }}>Gestión Contable/Finanzas</Typography>
+            <Typography variant="h4" sx={{ p:3, pb: 2 }}>Gestión Contable/Finanzas</Typography>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs value={value} onChange={handleChange} aria-label="pestañas de finanzas">
-                    <Tab label="Gestión de Cajas" id="finanzas-tab-0" />
-                    <Tab label="Gestión de Gastos" id="finanzas-tab-1" />
-                    <Tab label="Cheques" id="finanzas-tab-2" />
-                    <Tab label="Resumen Financiero" id="finanzas-tab-3" />
-                    <Tab label="Resumen Gastos" id="finanzas-tab-4" />
-                    <Tab label="Reglas de Pago" id="finanzas-tab-5" />
-                    <Tab label="Bancos" id="finanzas-tab-6" />
+                <Tabs value={value} onChange={handleChange} aria-label="pestañas de finanzas" variant="scrollable" scrollButtons="auto">
+                    <Tab label="Resumen" id="finanzas-tab-0" />
+                    <Tab label="Cajas" id="finanzas-tab-1" />
+                    <Tab label="Gastos" id="finanzas-tab-2" />
+                    <Tab label="Cheques" id="finanzas-tab-3" />
+                    <Tab label="Bancos" id="finanzas-tab-4" />
+                    <Tab label="Facturas" id="finanzas-tab-5" />
+                    <Tab label="Pagos" id="finanzas-tab-6" />
+                    <Tab label="Cuentas" id="finanzas-tab-7" />
+                    <Tab label="Reglas de Pago" id="finanzas-tab-8" />
+                    <Tab label="Tipos de Pago" id="finanzas-tab-9" />
                 </Tabs>
             </Box>
             <TabPanel value={value} index={0}>
-                <CashRegisterManagement />
-            </TabPanel>
-            <TabPanel value={value} index={1}>
-                <ExpenseManagement />
-            </TabPanel>
-            <TabPanel value={value} index={2}>
-                <ChequesManagement />
-            </TabPanel>
-            <TabPanel value={value} index={3}>
                 <FinancialSummary />
             </TabPanel>
+            <TabPanel value={value} index={1}>
+                <CashRegisterManagement />
+            </TabPanel>
+            <TabPanel value={value} index={2}>
+                <ExpenseManagement />
+            </TabPanel>
+            <TabPanel value={value} index={3}>
+                <ChequesManagement />
+            </TabPanel>
             <TabPanel value={value} index={4}>
-                <ExpenseSummary />
+                <BancosHub />
             </TabPanel>
             <TabPanel value={value} index={5}>
-                <PaymentRules />
+                <InvoiceManagement />
             </TabPanel>
             <TabPanel value={value} index={6}>
-                <BankManagement />
+                <PaymentManagement />
+            </TabPanel>
+            <TabPanel value={value} index={7}>
+                <AccountManagement />
+            </TabPanel>
+            <TabPanel value={value} index={8}>
+                <PaymentRules />
+            </TabPanel>
+            <TabPanel value={value} index={9}>
+                <PaymentMethodTypeManagement />
             </TabPanel>
         </Box>
     );

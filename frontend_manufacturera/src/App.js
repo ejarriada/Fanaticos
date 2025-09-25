@@ -29,6 +29,7 @@ import RemitosModule from './components/modules/RemitosModule';
 import TestComponent from './components/modules/TestComponent';
 import ClientesModule from './components/modules/ClientesModule';
 import ProductionTracking from './components/modules/ProductionTracking';
+import AdministrationModule from './components/modules/AdministrationModule';
 
 const drawerWidth = 240;
 
@@ -124,11 +125,10 @@ function MainApp() {
           {/* Routes for common modules (financial, HR, quotations) */}
           <Route path="/ventas" element={<PrivateRoute><VentasModule /></PrivateRoute>} />
           <Route path="/contable-finanzas" element={<PrivateRoute><FinanzasModule /></PrivateRoute>} />
-          <Route path="/factories" element={<PrivateRoute><FactoryManagement /></PrivateRoute>} />
           <Route path="/recursos-humanos" element={<PrivateRoute><RRHHModule /></PrivateRoute>} />
           <Route path="/presupuestos" element={<PrivateRoute><PresupuestoModule /></PrivateRoute>} />
+          <Route path="/administracion" element={<PrivateRoute><AdministrationModule /></PrivateRoute>} />
           
-          <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
           <Route path="/clientes" element={<PrivateRoute><ClientesModule /></PrivateRoute>} />
           <Route path="/proveedores" element={<PrivateRoute><ProveedoresModule /></PrivateRoute>} />
           <Route path="/reports" element={<PrivateRoute><ReportsModule /></PrivateRoute>} />

@@ -49,8 +49,7 @@ const Sidebar = ({ open, drawerWidth }) => {
         // Removed 'Productos Finales' and 'Productos'
         { text: 'Materia Prima', icon: <ScienceIcon />, path: '/materias-primas' },
         { text: 'Procesos', icon: <SettingsIcon />, path: '/processes' },
-        { text: 'Fábricas', icon: <FactoryIcon />, path: '/factories' },
-        { text: 'Usuarios', icon: <PeopleIcon />, path: '/users' },
+        { text: 'Administración', icon: <SettingsIcon />, path: '/administracion' },
         { text: 'Gestión de Clientes', icon: <PeopleIcon />, path: '/clientes' },
         { text: 'Recursos Humanos', icon: <GroupIcon />, path: '/recursos-humanos' },
         { text: 'Contable/Finanzas', icon: <MonetizationOnIcon />, path: '/contable-finanzas' },

@@ -75,6 +75,17 @@ const InvoiceForm = ({ open, onClose, onSave, invoice }) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    const handleSaleChange = (e) => {
+        const saleId = e.target.value;
+        const selectedSale = sales.find(s => s.id === saleId);
+        
+        setFormData(prevData => ({
+            ...prevData,
+            sale: saleId,
+            total_amount: selectedSale ? selectedSale.total_amount : '',
+        }));
+    };
+
     const handleSubmit = () => {
         onSave(formData);
     };

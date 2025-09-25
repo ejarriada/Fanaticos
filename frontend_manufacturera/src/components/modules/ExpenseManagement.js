@@ -150,7 +150,7 @@ const ExpenseManagement = () => {
     const fetchExpenses = async () => {
         try {
             setLoading(true);
-            const data = await api.list('/expenses/'); // Assuming an /expenses/ endpoint
+            const data = await api.list('/transactions/?account__account_type=Egreso'); // Fetch only expense-type transactions
             const expenseList = Array.isArray(data) ? data : data.results;
             setExpenses(expenseList || []);
             setError(null);
@@ -183,12 +183,13 @@ const ExpenseManagement = () => {
             const dataToSend = {
                 ...expenseData,
                 cash_register: expenseData.cash_register || null,
+                // Ensure we are setting the transaction type correctly if needed by the backend
             };
 
             if (selectedExpense) {
-                await api.update('/expenses/', selectedExpense.id, dataToSend);
+                await api.update('/transactions/', selectedExpense.id, dataToSend);
             } else {
-                await api.create('/expenses/', dataToSend);
+                await api.create('/transactions/', dataToSend);
             }
             fetchExpenses(); // Refresh list
             handleCloseForm();
@@ -205,7 +206,7 @@ const ExpenseManagement = () => {
     const handleDelete = async (id) => {
         if (window.confirm('¿Está seguro de que desea eliminar este gasto?')) {
             try {
-                await api.remove('/expenses/', id);
+                await api.remove('/transactions/', id);
                 fetchExpenses(); // Refresh list
             } catch (err) {
                 setError('Error al eliminar el gasto.');

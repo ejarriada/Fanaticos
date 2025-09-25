@@ -54,6 +54,10 @@ export const AuthProvider = ({ children }) => {
             setTenantId(tenant);
             localStorage.setItem('authToken', JSON.stringify(data));
             localStorage.setItem('tenantId', tenant);
+            
+            // Explicitly set up interceptors right after login
+            setupAxiosInterceptors(data, tenant);
+
             return { success: true };
         } catch (error) {
             const errorDetail = error.response?.data?.detail || 'Login failed';

@@ -10,8 +10,7 @@ import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 
 // User Form Dialog Component
-const UserForm = ({ open, onClose, onSave, user }) => {
-    const [formData, setFormData] = useState({});
+const UserForm = ({ open, onClose, onSave, user, formData, setFormData, handleChange }) => {
     const [systemRoles, setSystemRoles] = useState([]);
     const [loadingRoles, setLoadingRoles] = useState(true);
     const [rolesError, setRolesError] = useState(null);
@@ -36,28 +35,6 @@ const UserForm = ({ open, onClose, onSave, user }) => {
             fetchRoles();
         }
     }, [tenantId]);
-
-    useEffect(() => {
-        if (user) {
-            setFormData({
-                ...user,
-                roles: user.roles ? user.roles.map(role => role.id) : [], // Map roles to IDs for form
-            });
-        } else {
-            setFormData({
-                email: '',
-                password: '',
-                first_name: '',
-                last_name: '',
-                roles: [],
-            });
-        }
-    }, [user, open]);
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData({ ...formData, [name]: value });
-    };
 
     const handleRoleChange = (e) => {
         const { value } = e.target;
@@ -90,9 +67,9 @@ const UserForm = ({ open, onClose, onSave, user }) => {
         <Dialog open={open} onClose={onClose}>
             <DialogTitle>{user ? 'Editar Usuario' : 'Nuevo Usuario'}</DialogTitle>
             <DialogContent>
-                <TextField margin="dense" name="email" label="Email" type="email" fullWidth value={formData.email || ''} onChange={handleChange} />
+                <TextField margin="dense" name="email" label="Email" type="email" fullWidth value={formData.email || ''} onChange={handleChange} autoComplete="off" />
                 {!user && (
-                    <TextField margin="dense" name="password" label="Contraseña" type="password" fullWidth value={formData.password || ''} onChange={handleChange} />
+                    <TextField margin="dense" name="password" label="Contraseña" type="password" fullWidth value={formData.password || ''} onChange={handleChange} autoComplete="new-password" />
                 )}
                 <TextField margin="dense" name="first_name" label="Nombre" type="text" fullWidth value={formData.first_name || ''} onChange={handleChange} />
                 <TextField margin="dense" name="last_name" label="Apellido" type="text" fullWidth value={formData.last_name || ''} onChange={handleChange} />
@@ -131,7 +108,19 @@ const UserManagement = () => {
     const [error, setError] = useState(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
+    const [formData, setFormData] = useState({
+        email: '',
+        password: '',
+        first_name: '',
+        last_name: '',
+        roles: [],
+    });
     const { tenantId } = useAuth();
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+    };
 
     const fetchUsers = async () => {
         try {
@@ -155,7 +144,22 @@ const UserManagement = () => {
     }, [tenantId]);
 
     const handleOpenForm = (user = null) => {
-        setSelectedUser(user);
+        if (user) {
+            setSelectedUser(user);
+            setFormData({
+                ...user,
+                roles: user.roles ? user.roles.map(role => role.id) : [],
+            });
+        } else {
+            setSelectedUser(null);
+            setFormData({
+                email: '',
+                password: '',
+                first_name: '',
+                last_name: '',
+                roles: [],
+            });
+        }
         setIsFormOpen(true);
     };
 
@@ -245,6 +249,9 @@ const UserManagement = () => {
                 onClose={handleCloseForm} 
                 onSave={handleSave} 
                 user={selectedUser} 
+                formData={formData}
+                setFormData={setFormData}
+                handleChange={handleChange}
             />
         </Box>
     );
