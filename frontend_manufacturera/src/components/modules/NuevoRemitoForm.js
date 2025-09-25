@@ -32,6 +32,8 @@ const NuevoRemitoForm = () => {
     const [almacenes, setAlmacenes] = useState([]);
     const [productos, setProductos] = useState([]);
     const [productosInventario, setProductosInventario] = useState([]);
+    const [ventas, setVentas] = useState([]);
+    const [ventaSeleccionada, setVentaSeleccionada] = useState('');
     
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -41,13 +43,15 @@ const NuevoRemitoForm = () => {
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
-                const [clientesData, productosData] = await Promise.all([
+                const [clientesData, productosData, ventasData] = await Promise.all([
                     api.list('/clients/'),
-                    api.list('/products/')
+                    api.list('/products/'),
+                    api.list('/sales/')
                 ]);
                 
                 setClientes(clientesData.results || clientesData || []);
                 setProductos(productosData.results || productosData || []);
+                setVentas(ventasData.results || ventasData || []);
                 
                 // TODO: Cargar almacenes cuando esté disponible el endpoint
                 // const almacenesData = await api.list('/warehouses/');
@@ -147,6 +151,15 @@ const NuevoRemitoForm = () => {
 
     const handleEliminarItem = (itemId) => {
         setItems(prev => prev.filter(item => item.id !== itemId));
+    };
+
+    const handleItemQuantityChange = (itemId, newQuantity) => {
+        const quantity = parseInt(newQuantity, 10);
+        setItems(prev => 
+            prev.map(item => 
+                item.id === itemId ? { ...item, cantidad: isNaN(quantity) ? 0 : quantity } : item
+            )
+        );
     };
 
     const handleSubmit = async () => {
@@ -258,6 +271,58 @@ const NuevoRemitoForm = () => {
                                     {clientes.map(cliente => (
                                         <MenuItem key={cliente.id} value={cliente.id}>
                                             {cliente.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                    )}
+
+                    {formData.tipo === 'Venta' && (
+                        <Grid item xs={12} md={6}>
+                            <FormControl fullWidth>
+                                <InputLabel>Venta Asociada (Opcional)</InputLabel>
+                                <Select
+                                    name="venta"
+                                    value={ventaSeleccionada}
+                                    label="Venta Asociada (Opcional)"
+                                    onChange={async (e) => {
+                                        const selectedVentaId = e.target.value;
+                                        setVentaSeleccionada(selectedVentaId);
+
+                                        if (selectedVentaId) {
+                                            const venta = ventas.find(v => v.id === selectedVentaId);
+                                            if (venta) {
+                                                setFormData(prev => ({ ...prev, cliente: venta.client.id }));
+                                                
+                                                // Crear items con nombres de productos correctos
+                                                const itemsDeVenta = venta.items.map(itemVenta => {
+                                                    // Buscar el producto en la lista de productos cargados
+                                                    const productoEncontrado = productos.find(p => p.id === itemVenta.product);
+                                                    
+                                                    return {
+                                                        id: `venta-${itemVenta.id}`,
+                                                        codigo_barras: `BAR-VENTA-${itemVenta.product}`,
+                                                        producto_id: typeof itemVenta.product === 'object' ? itemVenta.product.id : itemVenta.product,
+                                                        producto_nombre: itemVenta.product_name || 
+                                                                        productos.find(p => p.id === (typeof itemVenta.product === 'object' ? itemVenta.product.id : itemVenta.product))?.name || 
+                                                                        `Producto ID: ${typeof itemVenta.product === 'object' ? itemVenta.product.id : itemVenta.product}`,
+                                                        cantidad: itemVenta.quantity,
+                                                        stock_disponible: 'N/A'
+                                                    };
+                                                });
+                                                setItems(itemsDeVenta);
+                                            }
+                                        } else {
+                                            // Si se deselecciona la venta, limpiar los items
+                                            setItems([]);
+                                        }
+                                    }}
+                                >
+                                    <MenuItem value=""><em>Ninguna</em></MenuItem>
+                                    {ventas.map(venta => (
+                                        <MenuItem key={venta.id} value={venta.id}>
+                                            {`Venta #${venta.id} - ${venta.client?.name || 'N/A'} - ${new Date(venta.sale_date).toLocaleDateString()}`}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -419,7 +484,15 @@ const NuevoRemitoForm = () => {
                                     <TableRow key={item.id}>
                                         <TableCell>{item.codigo_barras}</TableCell>
                                         <TableCell>{item.producto_nombre}</TableCell>
-                                        <TableCell>{item.cantidad}</TableCell>
+                                        <TableCell>
+                                            <TextField
+                                                type="number"
+                                                value={item.cantidad}
+                                                onChange={(e) => handleItemQuantityChange(item.id, e.target.value)}
+                                                inputProps={{ min: 0, style: { maxWidth: '80px' } }}
+                                                size="small"
+                                            />
+                                        </TableCell>
                                         <TableCell>{item.stock_disponible}</TableCell>
                                         <TableCell>
                                             <IconButton
