@@ -559,12 +559,17 @@ class PaymentMethodType(TenantAwareModel):
         return self.name
 
 class FinancialCostRule(TenantAwareModel):
-    name = models.CharField(max_length=100)
     payment_method = models.ForeignKey(PaymentMethodType, on_delete=models.CASCADE)
+    bank = models.ForeignKey(Bank, on_delete=models.CASCADE, null=True, blank=True, help_text="Banco asociado a esta regla, si aplica.")
     percentage = models.DecimalField(max_digits=5, decimal_places=2)
 
+    class Meta:
+        unique_together = ('payment_method', 'bank', 'tenant')
+
     def __str__(self):
-        return self.name
+        bank_name = self.bank.name if self.bank else "General"
+        return f"Regla {self.payment_method.name} ({bank_name})"
+
 
 # --- User, Roles, and HR Models ---
 

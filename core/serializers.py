@@ -588,9 +588,13 @@ class TransactionSerializer(TenantAwareSerializer):
         fields = '__all__'
 
 class InvoiceSerializer(TenantAwareSerializer):
+    client = serializers.StringRelatedField()
+    sale = serializers.StringRelatedField()
+    purchase_order = serializers.StringRelatedField()
+
     class Meta(TenantAwareSerializer.Meta):
         model = Invoice
-        fields = '__all__'
+        fields = ['id', 'client', 'date', 'total_amount', 'status', 'sale', 'purchase_order']
 
 class PaymentSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):
@@ -618,9 +622,15 @@ class PaymentMethodTypeSerializer(TenantAwareSerializer):
         fields = '__all__'
 
 class FinancialCostRuleSerializer(TenantAwareSerializer):
+    payment_method_name = serializers.CharField(source='payment_method.name', read_only=True)
+    bank_name = serializers.CharField(source='bank.name', read_only=True)
+
+    payment_method = serializers.PrimaryKeyRelatedField(queryset=PaymentMethodType.objects.all(), write_only=True)
+    bank = serializers.PrimaryKeyRelatedField(queryset=Bank.objects.all(), allow_null=True, required=False, write_only=True)
+
     class Meta(TenantAwareSerializer.Meta):
         model = FinancialCostRule
-        fields = '__all__'
+        fields = ['id', 'payment_method', 'payment_method_name', 'bank', 'bank_name', 'percentage']
 
 class FactorySerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):

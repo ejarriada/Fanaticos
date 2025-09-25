@@ -72,7 +72,24 @@ const InvoiceForm = ({ open, onClose, onSave, invoice }) => {
     }, [invoice, open]);
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        
+        // Si se selecciona una venta, auto-completar los campos relacionados
+        if (name === 'sale' && value) {
+            const selectedSale = sales.find(sale => sale.id === parseInt(value));
+            if (selectedSale) {
+                setFormData({
+                    ...formData,
+                    [name]: value,
+                    client: selectedSale.client?.id || selectedSale.client || '',
+                    total_amount: selectedSale.total_amount || '',
+                    purchase_order: selectedSale.purchase_order?.id || selectedSale.purchase_order || ''
+                });
+                return;
+            }
+        }
+        
+        setFormData({ ...formData, [name]: value });
     };
 
     const handleSaleChange = (e) => {
@@ -114,22 +131,6 @@ const InvoiceForm = ({ open, onClose, onSave, invoice }) => {
             <DialogContent>
                 <TextField
                     margin="dense"
-                    name="client"
-                    label="Cliente"
-                    select
-                    fullWidth
-                    value={formData.client || ''}
-                    onChange={handleChange}
-                >
-                    {clients.map((client) => (
-                        <MenuItem key={client.id} value={client.id}>
-                            {client.name}
-                        </MenuItem>
-                    ))}
-                </TextField>
-
-                <TextField
-                    margin="dense"
                     name="sale"
                     label="Venta Relacionada"
                     select
@@ -140,7 +141,24 @@ const InvoiceForm = ({ open, onClose, onSave, invoice }) => {
                 >
                     {sales.map((sale) => (
                         <MenuItem key={sale.id} value={sale.id}>
-                            Venta #{sale.id} ({sale.total_amount})
+                            Venta #{sale.id}
+                        </MenuItem>
+                    ))}
+                </TextField>
+
+
+                <TextField
+                    margin="dense"
+                    name="client"
+                    label="Cliente"
+                    select
+                    fullWidth
+                    value={formData.client || ''}
+                    onChange={handleChange}
+                >
+                    {clients.map((client) => (
+                        <MenuItem key={client.id} value={client.id}>
+                            {client.name}
                         </MenuItem>
                     ))}
                 </TextField>
@@ -282,6 +300,7 @@ const InvoiceManagement = () => {
                     <Table>
                         <TableHead>
                             <TableRow>
+                                <TableCell>Factura ID</TableCell>
                                 <TableCell>Cliente</TableCell>
                                 <TableCell>Fecha</TableCell>
                                 <TableCell>Monto Total</TableCell>
@@ -292,7 +311,8 @@ const InvoiceManagement = () => {
                         <TableBody>
                             {invoices.map((invoice) => (
                                 <TableRow key={invoice.id}>
-                                    <TableCell>{invoice.client_name || invoice.client}</TableCell>
+                                    <TableCell>{invoice.id}</TableCell>
+                                    <TableCell>{invoice.client}</TableCell>
                                     <TableCell>{invoice.date}</TableCell>
                                     <TableCell>{invoice.total_amount}</TableCell>
                                     <TableCell>{invoice.status}</TableCell>
