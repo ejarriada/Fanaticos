@@ -8,22 +8,26 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import QrCodeIcon from '@mui/icons-material/QrCode';
 import * as api from '../../utils/api';
 import ProductionOrderFormIndumentaria from './ProductionOrderFormIndumentaria';
 import ProductionOrderFormMedias from './ProductionOrderFormMedias';
+import QrCodeDisplayDialog from './QrCodeDisplayDialog';
 
 const ProductionOrderManagement = () => {
     const [productionOrders, setProductionOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [opTypeFilter, setOpTypeFilter] = useState('all'); // State for the filter
+    const [opTypeFilter, setOpTypeFilter] = useState('all');
     
-    // State for dialogs and flow control
     const [isProductTypeDialogOpen, setProductTypeDialogOpen] = useState(false);
     const [isFormOpen, setFormOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [selectedProductType, setSelectedProductType] = useState('Indumentaria');
     const [selectedCreationFlow, setSelectedCreationFlow] = useState('fromSale');
+
+    const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
+    const [qrCodeData, setQrCodeData] = useState(null);
 
     const fetchProductionOrders = async (filter = 'all') => {
         try {
@@ -55,12 +59,22 @@ const ProductionOrderManagement = () => {
     };
 
     const handleEditClick = (order) => {
-        // When editing, set the flow based on the existing order
         const flow = order.order_note ? 'fromSale' : 'internal';
         setSelectedCreationFlow(flow);
         setSelectedOrder(order);
         setSelectedProductType(order.op_type || 'Indumentaria');
         setFormOpen(true);
+    };
+
+    const handleGenerateQrCode = async (order) => {
+        try {
+            const response = await api.create(`/production-orders/${order.id}/generate_qr_code/`, {});
+            setQrCodeData(response.qr_code_data);
+            setIsQrDialogOpen(true);
+        } catch (err) {
+            setError('Error al generar el código QR.');
+            console.error(err);
+        }
     };
 
     const handleStartNewOrder = () => {
@@ -226,6 +240,7 @@ const ProductionOrderManagement = () => {
                                     <TableCell>
                                         <IconButton onClick={() => handleEditClick(order)}><EditIcon /></IconButton>
                                         <IconButton onClick={() => handleDelete(order.id)}><DeleteIcon /></IconButton>
+                                        <IconButton onClick={() => handleGenerateQrCode(order)}><QrCodeIcon /></IconButton>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -289,6 +304,13 @@ const ProductionOrderManagement = () => {
 
             {/* Render the correct form */}
             {renderForm()}
+
+            <QrCodeDisplayDialog 
+                open={isQrDialogOpen}
+                onClose={() => setIsQrDialogOpen(false)}
+                qrCodeData={qrCodeData}
+                title="Código QR de Orden de Producción"
+            />
         </Box>
     );
 };

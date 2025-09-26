@@ -1,49 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Box, Button, Paper, Table, TableBody, TableCell, TableContainer, 
-    TableHead, TableRow, IconButton, Typography, Dialog, DialogActions, 
-    DialogContent, DialogTitle, TextField, CircularProgress, Alert 
+    TableHead, TableRow, IconButton, Typography, CircularProgress, Alert 
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
-
-// Bank Form Dialog Component
-const BankForm = ({ open, onClose, onSave, bank }) => {
-    const [formData, setFormData] = useState({});
-
-    useEffect(() => {
-        if (bank) {
-            setFormData(bank);
-        } else {
-            setFormData({
-                name: ''
-            });
-        }
-    }, [bank, open]);
-
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-    const handleSubmit = () => {
-        onSave(formData);
-    };
-
-    return (
-        <Dialog open={open} onClose={onClose}>
-            <DialogTitle>{bank ? 'Editar Banco' : 'Nuevo Banco'}</DialogTitle>
-            <DialogContent>
-                <TextField margin="dense" name="name" label="Nombre" type="text" fullWidth value={formData.name || ''} onChange={handleChange} />
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose}>Cancelar</Button>
-                <Button onClick={handleSubmit}>Guardar</Button>
-            </DialogActions>
-        </Dialog>
-    );
-};
+import BankForm from './BankForm'; // Import the new component
 
 // Main Bank Management Component
 const BankManagement = () => {

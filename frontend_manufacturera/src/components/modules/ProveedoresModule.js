@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import {
     Box, Tab, Tabs, Typography,
-    TextField, Button, Checkbox, FormControlLabel, Select, MenuItem, FormControl, InputLabel
+    TextField, Button, Checkbox, FormControlLabel, Select, MenuItem, FormControl, InputLabel, IconButton
 } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 
 import SupplierList from './SupplierList';
 import ComprasProveedor from './ComprasProveedor';
 import CuentaCorrienteProveedor from './CuentaCorrienteProveedor';
 import PagosProveedor from './PagosProveedor';
-import NewPurchaseForm from './NewPurchaseForm'; // Import the new component
+import NewPurchaseForm from './NewPurchaseForm';
+import BankForm from './BankForm'; // Import the BankForm component
 import * as api from '../../utils/api';
 
 // Formulario de Proveedor anidado para simplicidad de estado
-const SupplierForm = ({ onSave, onCancel, supplier, suppliers, onSelectSupplier }) => {
+const SupplierForm = ({ onSave, onCancel, supplier, suppliers, onSelectSupplier, banks, onNewBank }) => {
     const [formData, setFormData] = useState({});
 
     React.useEffect(() => {
@@ -78,7 +80,26 @@ const SupplierForm = ({ onSave, onCancel, supplier, suppliers, onSelectSupplier 
             <TextField sx={{ mt: 2 }} margin="dense" name="email" label="Email" type="email" fullWidth value={formData.email || ''} onChange={handleChange} />
             <TextField sx={{ mt: 2 }} margin="dense" name="business_sector" label="Rubro" type="text" fullWidth value={formData.business_sector || ''} onChange={handleChange} />
             <TextField sx={{ mt: 2 }} margin="dense" name="iva_condition" label="Condición IVA" type="text" fullWidth value={formData.iva_condition || ''} onChange={handleChange} />
-            <TextField sx={{ mt: 2 }} margin="dense" name="bank" label="Banco" type="text" fullWidth value={formData.bank || ''} onChange={handleChange} />
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
+                <FormControl fullWidth>
+                    <InputLabel>Banco</InputLabel>
+                    <Select
+                        name="bank"
+                        value={formData.bank || ''}
+                        onChange={handleChange}
+                        label="Banco"
+                    >
+                        {banks.map(b => (
+                            <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+                <IconButton onClick={onNewBank} color="primary">
+                    <AddIcon />
+                </IconButton>
+            </Box>
+
             <TextField sx={{ mt: 2 }} margin="dense" name="account_number" label="Número de Cuenta" type="text" fullWidth value={formData.account_number || ''} onChange={handleChange} />
             <FormControlLabel
                 control={
@@ -124,6 +145,9 @@ const ProveedoresModule = () => {
     const [selectedSupplier, setSelectedSupplier] = useState(null);
     const [suppliers, setSuppliers] = useState([]);
     const [refreshList, setRefreshList] = useState(false);
+    const [banks, setBanks] = useState([]);
+    const [isBankFormOpen, setIsBankFormOpen] = useState(false);
+    const [refreshCompras, setRefreshCompras] = useState(false); // New state for refreshing purchases
 
     const fetchSuppliers = async () => {
         try {
@@ -134,8 +158,18 @@ const ProveedoresModule = () => {
         }
     };
 
+    const fetchBanks = async () => {
+        try {
+            const data = await api.list('/banks/');
+            setBanks(Array.isArray(data) ? data : data.results || []);
+        } catch (err) {
+            console.error("Error fetching banks", err);
+        }
+    };
+
     useEffect(() => {
         fetchSuppliers();
+        fetchBanks();
     }, [refreshList]);
 
     const handleChange = (event, newValue) => {
@@ -182,6 +216,21 @@ const ProveedoresModule = () => {
         }
     };
 
+    const handleSaveNewBank = async (bankData) => {
+        try {
+            await api.create('/banks/', bankData);
+            setIsBankFormOpen(false);
+            fetchBanks(); // Refresh the banks list
+        } catch (err) {
+            console.error("Error creating bank", err);
+        }
+    };
+
+    const handlePurchaseSaveSuccess = () => {
+        setRefreshCompras(prev => !prev); // Toggle to trigger refresh in ComprasProveedor
+        setValue(1); // Switch to 'Compras' tab
+    };
+
     return (
         <Box sx={{ width: '100%' }}>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -198,7 +247,7 @@ const ProveedoresModule = () => {
                 <SupplierList onEdit={handleEditSupplier} refresh={refreshList} />
             </TabPanel>
             <TabPanel value={value} index={1}>
-                <ComprasProveedor onNewPurchase={handleNewPurchase} />
+                <ComprasProveedor onNewPurchase={handleNewPurchase} refresh={refreshCompras} suppliers={suppliers} />
             </TabPanel>
             <TabPanel value={value} index={2}>
                 <CuentaCorrienteProveedor />
@@ -213,11 +262,19 @@ const ProveedoresModule = () => {
                     supplier={selectedSupplier} 
                     suppliers={suppliers}
                     onSelectSupplier={handleSelectSupplier}
+                    banks={banks}
+                    onNewBank={() => setIsBankFormOpen(true)}
                 />
             </TabPanel>
             <TabPanel value={value} index={5}>
-                <NewPurchaseForm suppliers={suppliers} onCancel={handleCancelPurchase} />
+                <NewPurchaseForm suppliers={suppliers} onCancel={handleCancelPurchase} onSaveSuccess={handlePurchaseSaveSuccess} />
             </TabPanel>
+
+            <BankForm 
+                open={isBankFormOpen} 
+                onClose={() => setIsBankFormOpen(false)} 
+                onSave={handleSaveNewBank} 
+            />
         </Box>
     );
 };

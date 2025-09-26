@@ -49,7 +49,7 @@ class MateriaPrimaProveedor(TenantAwareModel):
     raw_material = models.ForeignKey(RawMaterial, on_delete=models.CASCADE, related_name="proveedores")
     supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE, related_name="materias_primas")
     supplier_code = models.CharField(max_length=100, blank=True, null=True)
-    brands = models.ManyToManyField(Brand, blank=True)
+    brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True)
     cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     current_stock = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     batch_number = models.CharField(max_length=100, blank=True, null=True)
@@ -303,11 +303,14 @@ class OrderNote(TenantAwareModel):
 
 class ProductionOrder(TenantAwareModel):
     OP_TYPE_CHOICES = [('Medias', 'Medias'), ('Indumentaria', 'Indumentaria')]
-    STATUS_CHOICES = [('Pendiente', 'Pendiente'), ('En Proceso', 'En Proceso'), ('Completada', 'Completada'), ('Cancelada', 'Cancelada')]
+    STATUS_CHOICES = [('Pendiente', 'Pendiente'), ('Comprada por Pagar', 'Comprada por Pagar'), ('Pagada', 'Pagada'), ('Pago Parcial', 'Pago Parcial'), ('Cancelada', 'Cancelada')]
 
     # Link to OrderNote is now optional
     order_note = models.ForeignKey(OrderNote, on_delete=models.CASCADE, related_name='production_orders', null=True, blank=True)
     
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    paid_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
     # New fields for the redesign
     base_product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True, help_text="Producto base usado como plantilla para talles y colores.")
     equipo = models.CharField(max_length=255, blank=True)
@@ -443,16 +446,17 @@ class Supplier(TenantAwareModel):
 
 class PurchaseOrder(TenantAwareModel):
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
+    user = models.ForeignKey('User', on_delete=models.SET_NULL, null=True, blank=True) # New field
     order_date = models.DateField(auto_now_add=True)
     expected_delivery_date = models.DateField()
-    status = models.CharField(max_length=50, default='Pendiente', choices=[('Pendiente', 'Pendiente'), ('Recibida', 'Recibida'), ('Cancelada', 'Cancelada')])
+    status = models.CharField(max_length=50, default='Pendiente', choices=[('Pendiente', 'Pendiente'), ('Comprada por Pagar', 'Comprada por Pagar'), ('Pagada', 'Pagada')])
 
     def __str__(self):
         return f"Orden de Compra #{self.id} - {self.supplier.name}"
 
 class PurchaseOrderItem(TenantAwareModel):
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='items')
-    product = models.ForeignKey(Product, on_delete=models.CASCADE) # Uncommented
+    raw_material = models.ForeignKey(RawMaterial, on_delete=models.CASCADE, null=True)
     quantity = models.IntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     destination_local = models.ForeignKey('Local', on_delete=models.SET_NULL, null=True, blank=True)
@@ -520,7 +524,7 @@ class Invoice(TenantAwareModel):
         return f"Factura #{self.id} - {self.client.name}"
 
 class Payment(TenantAwareModel):
-    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='payments')
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='payments', null=True)
     date = models.DateField()
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_method = models.CharField(max_length=100)

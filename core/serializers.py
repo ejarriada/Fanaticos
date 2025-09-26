@@ -4,7 +4,7 @@ from decimal import Decimal
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.db import transaction
-from django.db.models import Max, Sum
+from django.db.models import Max, Sum, F
 from .models import (
     Product, Tenant, User, SystemRole, Process, OrderNote, ProductionOrder, ProductionOrderItem, ProductionOrderFile, 
     RawMaterial, Brand, MateriaPrimaProveedor, PedidoMaterial, 
@@ -544,11 +544,12 @@ class MateriaPrimaProveedorSerializer(TenantAwareSerializer):
         queryset=RawMaterial.objects.all()
     )
     supplier = serializers.PrimaryKeyRelatedField(queryset=Supplier.objects.all())
-    brands = serializers.PrimaryKeyRelatedField(
-        queryset=Brand.objects.all(), many=True, required=False
+    brand = serializers.PrimaryKeyRelatedField(
+        queryset=Brand.objects.all(), required=False, allow_null=True
     )
     
     name = serializers.CharField(source='raw_material.name', read_only=True)
+    description = serializers.CharField(source='raw_material.description', read_only=True)
     category = serializers.CharField(source='raw_material.category', read_only=True)
     unit_of_measure = serializers.CharField(source='raw_material.unit_of_measure', read_only=True)
     supplier_name = serializers.CharField(source='supplier.name', read_only=True)
@@ -556,21 +557,70 @@ class MateriaPrimaProveedorSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):
         model = MateriaPrimaProveedor
         fields = [
-            'id', 'raw_material', 'supplier', 'brands', 'supplier_code', 
+            'id', 'raw_material', 'supplier', 'brand', 'supplier_code', 
             'cost', 'current_stock', 'batch_number', 'qr_code_data',
-            'name', 'category', 'unit_of_measure', 'supplier_name'
+            'name', 'description', 'category', 'unit_of_measure', 'supplier_name'
         ]
         read_only_fields = ('batch_number', 'qr_code_data')
-
-class PurchaseOrderSerializer(TenantAwareSerializer):
-    class Meta(TenantAwareSerializer.Meta):
-        model = PurchaseOrder
-        fields = '__all__'
 
 class PurchaseOrderItemSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):
         model = PurchaseOrderItem
-        fields = '__all__'
+        fields = ['id', 'purchase_order', 'raw_material', 'quantity', 'unit_price', 'destination_local']
+        read_only_fields = ('purchase_order',)
+
+class PurchaseOrderSerializer(TenantAwareSerializer):
+    items = PurchaseOrderItemSerializer(many=True)
+    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
+    user_name = serializers.SerializerMethodField()
+    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    paid_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = PurchaseOrder
+        fields = ['id', 'supplier', 'supplier_name', 'user', 'user_name', 'order_date', 'expected_delivery_date', 'status', 'total_amount', 'paid_amount', 'items']
+
+    def get_user_name(self, obj):
+        return obj.user.first_name if obj.user else None
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        with transaction.atomic():
+            purchase_order = PurchaseOrder.objects.create(**validated_data)
+            total_amount = Decimal('0.00')
+            for item_data in items_data:
+                item = PurchaseOrderItem.objects.create(purchase_order=purchase_order, tenant=purchase_order.tenant, **item_data)
+                total_amount += item.quantity * item.unit_price
+            purchase_order.total_amount = total_amount
+            purchase_order.paid_amount = Decimal('0.00') # Initially unpaid
+            purchase_order.save()
+        return purchase_order
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', None)
+        # Pop read-only fields that are calculated/managed internally
+        validated_data.pop('total_amount', None)
+        validated_data.pop('paid_amount', None)
+
+        # Update scalar fields of the PurchaseOrder instance
+        instance.supplier = validated_data.get('supplier', instance.supplier)
+        instance.user = validated_data.get('user', instance.user)
+        instance.order_date = validated_data.get('order_date', instance.order_date)
+        instance.expected_delivery_date = validated_data.get('expected_delivery_date', instance.expected_delivery_date)
+        instance.status = validated_data.get('status', instance.status)
+        instance.save()
+
+        # Handle nested items if provided
+        if items_data is not None:
+            instance.items.all().delete() # Delete existing items
+            total_amount = Decimal('0.00')
+            for item_data in items_data:
+                item = PurchaseOrderItem.objects.create(purchase_order=instance, tenant=instance.tenant, **item_data)
+                total_amount += item.quantity * item.unit_price
+            instance.total_amount = total_amount
+            instance.save(update_fields=['total_amount'])
+
+        return instance
 
 class AccountSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):
@@ -597,9 +647,43 @@ class InvoiceSerializer(TenantAwareSerializer):
         fields = ['id', 'client', 'date', 'total_amount', 'status', 'sale', 'purchase_order']
 
 class PaymentSerializer(TenantAwareSerializer):
+    payment_method_name = serializers.CharField(source='payment_method.name', read_only=True)
+    account = serializers.PrimaryKeyRelatedField(queryset=Account.objects.all(), write_only=True)
+    cash_register = serializers.PrimaryKeyRelatedField(queryset=CashRegister.objects.all(), required=False, allow_null=True, write_only=True)
+
     class Meta(TenantAwareSerializer.Meta):
         model = Payment
-        fields = '__all__'
+        fields = ['id', 'purchase_order', 'date', 'amount', 'payment_method', 'payment_method_name', 'account', 'cash_register']
+        read_only_fields = ('date',)
+
+    def create(self, validated_data):
+        account = validated_data.pop('account')
+        cash_register = validated_data.pop('cash_register', None)
+        
+        with transaction.atomic():
+            payment = Payment.objects.create(**validated_data)
+
+            # Update PurchaseOrder paid_amount and status
+            purchase_order = payment.purchase_order
+            purchase_order.paid_amount += payment.amount
+            if purchase_order.paid_amount >= purchase_order.total_amount:
+                purchase_order.status = 'Pagada'
+            elif purchase_order.paid_amount > 0:
+                purchase_order.status = 'Pago Parcial'
+            else:
+                purchase_order.status = 'Pendiente' # Should not happen if amount > 0
+            purchase_order.save()
+
+            # Create a corresponding Transaction
+            Transaction.objects.create(
+                tenant=payment.tenant,
+                description=f"Pago a proveedor por OC #{payment.purchase_order.id}",
+                amount=payment.amount,
+                account=account,
+                cash_register=cash_register,
+                related_purchase=payment.purchase_order,
+            )
+            return payment
 
 class BankStatementSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):

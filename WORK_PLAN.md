@@ -1,38 +1,61 @@
-# Plan de Trabajo: Puesta en Marcha del Sistema
+# Plan de Trabajo: Fanaticos Manufactura
 
-Este documento describe los pasos para restaurar y verificar el funcionamiento del sistema "Fanaticos" después de la recuperación de archivos y el cambio de directorio.
+Este documento registra el plan de acción para probar, depurar y validar el frontend de Manufactura. Se actualizará a medida que completemos cada paso.
 
-## 1. Diagnóstico y Correcciones Realizadas
+## Fase 1: Abastecimiento y Compras
 
-Se ha realizado un análisis exhaustivo del sistema para identificar problemas derivados del cambio de entorno.
+**Objetivo:** Asegurar que el flujo de alta de proveedores, materias primas, compras y pagos funcione correctamente y que los datos se conecten entre los módulos.
 
-- **[CORREGIDO] Error de Comunicación Frontend-Backend:**
-  - **Problema:** Los frontends (`frontend_manufacturera` y `frontend_comercializadora`) intentaban conectarse a `http://localhost:8000/api`. Dentro de Docker, `localhost` apunta al propio contenedor del frontend, no al del backend.
-  - **Solución:** Se modificaron los archivos `src/utils/axiosInstance.js` en ambos frontends para que apunten al nombre del servicio de Docker: `http://backend:8000/api`. Este cambio es permanente y necesario para el funcionamiento en contenedores.
+### Sub-Fase 1.1: Módulo de Proveedores
+- [x] **Análisis Inicial:** Analizar `ProveedoresModule.js` para encontrar el formulario de alta.
+- [x] **Detección de Desconexión:** Identificar que el campo "Banco" era de texto libre en lugar de un desplegable.
+- [x] **Investigación:** Encontrar el componente `BankForm` y la API de bancos en `BankManagement.js`.
+- [x] **Refactorización y Integración:** Implementar la lógica para el alta de bancos desde el formulario de proveedores.
+- [x] **Depuración:** Corregir errores de sintaxis y de compilación post-integración.
+- [x] **Prueba de Usuario:** El usuario ha confirmado que el sistema compila y ha dado de alta un proveedor.
 
-- **[VERIFICADO] Integridad de Archivos de Configuración:**
-  - Se revisaron `sistema_fanaticos_backend/settings.py` y los `Dockerfile` de cada servicio.
-  - **Resultado:** No se encontraron rutas absolutas o incorrectas. Utilizan rutas relativas, lo cual es una buena práctica.
+### Sub-Fase 1.2: Módulo de Materias Primas
+- [x] **Análisis Inicial:** Analizar `MateriasPrimasModule.js` y `RawMaterialList.js` para encontrar el formulario de alta.
+- [x] **Depuración (Campo Descripción):** Detectar y corregir el error que impedía ver la descripción en el modo de edición, modificando el `MateriaPrimaProveedorSerializer` en el backend.
+- [x] **Detección de Inconsistencia:** Identificar que el modelo de datos permitía múltiples marcas por materia prima, contrario al requisito de negocio (una sola marca).
+- [x] **Corrección de Modelo (Backend):** Modificar el modelo `MateriaPrimaProveedor` y su serializador para usar una relación `ForeignKey` (una marca) en lugar de `ManyToManyField` (muchas marcas).
+- [x] **Migración de Base de Datos (Usuario):** El usuario ha aplicado las migraciones para actualizar la estructura de la base de datos.
+- [x] **Corrección de Interfaz (Frontend):** Ajustar el formulario para usar un selector simple de marca, reflejando el cambio del backend.
+- [x] **Prueba de Flujo:** El usuario ha confirmado la creación exitosa de una materia prima, asociando proveedor y marca.
 
-- **[REVERTIDO] Cambio Temporal de Puertos:**
-  - Se revirtieron los cambios en `docker-compose.yml` para mantener los puertos originales (`8000`, `3001`, `3002`).
+### Desvío Técnico: Estandarización de Códigos QR
+- [x] **Objetivo:** Unificar la generación de códigos QR para usar una única librería local y estandarizar el comportamiento en toda la aplicación.
+- [x] **Análisis:** Detectar que el módulo `ProductionTracking` usaba un servicio de QR online.
+- [x] **Refactorización (Frontend):** Extraer el diálogo de visualización de QR a un componente reutilizable (`QrCodeDisplayDialog.js`).
+- [x] **Implementación (Backend):** Crear y mejorar las funciones `generate_qr_code` en los `ViewSet` correspondientes.
+- [x] **Integración (Frontend):** Modificar todos los módulos (`RawMaterialList`, `ProductionOrderManagement`, `ProductionTracking`) para usar el flujo estandarizado.
+- [x] **Depuración:** Corregir errores de compilación y de URL durante la integración.
+- [x] **Prueba de Usuario:** El usuario ha confirmado que la funcionalidad de QR es ahora consistente y funciona como se espera.
 
-## 2. Pasos para la Puesta en Marcha (Post-Reinicio)
+### Sub-Fase 1.3: Compras y Pagos (En curso)
+- [x] **Análisis:** Investigar los componentes `ComprasProveedor.js`, `NewPurchaseForm.js`, `PagosProveedor.js` y `CuentaCorrienteProveedor.js`.
+- [x] **Rediseño y Conexión (Backend):**
+  - [x] Modificar el modelo `PurchaseOrderItem` para que se vincule a `RawMaterial` en lugar de `Product`.
+  - [x] Modificar el `PurchaseOrderSerializer` para incluir `supplier_name`, `user_name` y `total_amount` calculados, y para manejar la creación/actualización anidada de items.
+  - [x] Modificar el `PurchaseOrderViewSet` para asignar automáticamente el usuario creador.
+  - [x] Corregir errores de `NameError` (`User`, `F`) y `AssertionError` (`update` de anidados) en el backend.
+  - [x] El usuario ha aplicado las migraciones necesarias.
+- [x] **Implementación (Frontend):**
+  - [x] Rediseñar `NewPurchaseForm.js` para la creación/edición de órdenes de compra basadas en items de materias primas.
+  - [x] Modificar `ComprasProveedor.js` para mostrar las nuevas columnas (Proveedor, Usuario, Total) y añadir acciones de Editar/Eliminar.
+  - [x] Conectar `ProveedoresModule.js` para pasar las props necesarias y manejar el refresco de la lista.
+- [ ] **Prueba de Flujo:**
+  - [ ] Simular la creación de una nueva orden de compra para una materia prima existente.
+  - [ ] Simular el registro de un pago (parcial o total) para esa compra.
+- [ ] **Verificación:**
+  - [ ] Comprobar que el stock de la materia prima no se ve afectado (la compra es un pedido, no una recepción).
+  - [ ] Comprobar que el estado de la cuenta corriente del proveedor se actualiza correctamente.
 
-- **[COMPLETADO] Reinicio del Equipo:**
-  - **Acción:** El usuario reinició el equipo.
-  - **Objetivo:** Liberar todos los puertos de red (`8000`, `3001`, `3002`) que estaban previamente ocupados.
+---
 
-- **[COMPLETADO] Levantar el Entorno Docker:**
-  - **Comando:** `docker-compose up --build -d`
-  - **Objetivo:** Construir las imágenes de los contenedores e iniciarlos en segundo plano una vez que los puertos estén libres.
-  - **Nota:** Se requirió iniciar el servicio de Docker (`sudo systemctl start docker`) y solucionar un problema de dependencias en `frontend_comercializadora`.
+## Fase 2: Diseño y Producción (Próximamente)
 
-## 3. Verificación Final
+**Objetivo:** Validar la creación de productos finales, la asignación de costos y el flujo de órdenes de producción.
 
-Una vez que los contenedores están en ejecución:
+- [ ] ...
 
-1.  **[COMPLETADO] Verificar Logs:** Ejecutar `docker-compose logs` para ver la salida de los tres contenedores y asegurar que no haya errores.
-2.  **[COMPLETADO] Verificar Backend:** Usar `curl` para acceder a `http://localhost:8000/api/`. Se obtuvo una respuesta correcta.
-3.  **[COMPLETADO] Verificar Frontend Comercializadora:** Usar `curl` para acceder a `http://localhost:3001`. Se obtuvo un código de estado 200.
-4.  **[COMPLETADO] Verificar Frontend Manufacturera:** Usar `curl` para acceder a `http://localhost:3002`. Se obtuvo un código de estado 200.

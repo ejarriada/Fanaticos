@@ -8,57 +8,74 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import QrCodeIcon from '@mui/icons-material/QrCode';
+import AddIcon from '@mui/icons-material/Add';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
+import BrandForm from './BrandForm';
+import QrCodeDisplayDialog from './QrCodeDisplayDialog';
 
 // RawMaterial Form Dialog Component
-const RawMaterialForm = ({ open, onClose, onSave, rawMaterial }) => {
+const RawMaterialForm = ({ open, onClose, onSave, rawMaterial, onNewBrand, onBrandCreated }) => {
     const [formData, setFormData] = useState({});
     const [suppliers, setSuppliers] = useState([]);
     const [loadingSuppliers, setLoadingSuppliers] = useState(true);
     const [suppliersError, setSuppliersError] = useState(null);
-    const [brandsList, setBrandsList] = useState([]); // List of brands
+    const [brandsList, setBrandsList] = useState([]);
     const [loadingBrands, setLoadingBrands] = useState(true);
     const [brandsError, setBrandsError] = useState(null);
     const { tenantId } = useAuth();
 
+    const fetchBrands = async () => {
+        try {
+            setLoadingBrands(true);
+            const brandsData = await api.list('/brands/');
+            setBrandsList(Array.isArray(brandsData) ? brandsData : brandsData.results || []);
+            setBrandsError(null);
+        } catch (err) {
+            setBrandsError('Error al cargar las marcas.');
+            console.error(err);
+        } finally {
+            setLoadingBrands(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchSuppliersAndBrands = async () => {
+        const fetchSuppliers = async () => {
             try {
                 setLoadingSuppliers(true);
-                setLoadingBrands(true);
-
                 const suppliersData = await api.list('/suppliers/');
                 setSuppliers(Array.isArray(suppliersData) ? suppliersData : suppliersData.results || []);
-
-                const brandsData = await api.list('/brands/');
-                setBrandsList(Array.isArray(brandsData) ? brandsData : brandsData.results || []);
-
+                setSuppliersError(null);
             } catch (err) {
                 setSuppliersError('Error al cargar los proveedores.');
-                setBrandsError('Error al cargar las marcas.');
                 console.error(err);
             } finally {
                 setLoadingSuppliers(false);
-                setLoadingBrands(false);
             }
         };
 
         if (tenantId && open) {
-            fetchSuppliersAndBrands();
+            fetchSuppliers();
+            fetchBrands();
         }
     }, [tenantId, open]);
+    
+    useEffect(() => {
+        if (onBrandCreated) {
+            fetchBrands();
+        }
+    }, [onBrandCreated]);
 
     useEffect(() => {
         if (rawMaterial) {
-            // When editing, rawMaterial is a MateriaPrimaProveedor object
             setFormData({
                 ...rawMaterial,
-                supplier: rawMaterial.supplier, // It should be the ID
+                supplier: rawMaterial.supplier, 
                 name: rawMaterial.name,
-                description: rawMaterial.description, // Assuming description is available
+                description: rawMaterial.description, 
                 category: rawMaterial.category,
                 unit_of_measure: rawMaterial.unit_of_measure,
+                brand: rawMaterial.brand || '',
             });
         } else {
             setFormData({
@@ -69,7 +86,7 @@ const RawMaterialForm = ({ open, onClose, onSave, rawMaterial }) => {
                 supplier: '',
                 batch_number: '',
                 cost: 0,
-                brands: [],
+                brand: '',
                 current_stock: '',
             });
         }
@@ -84,7 +101,7 @@ const RawMaterialForm = ({ open, onClose, onSave, rawMaterial }) => {
         onSave(formData);
     };
 
-    if (loadingSuppliers || loadingBrands) {
+    if (loadingSuppliers) {
         return (
             <Dialog open={open} onClose={onClose}>
                 <DialogTitle>Cargando datos...</DialogTitle>
@@ -93,13 +110,12 @@ const RawMaterialForm = ({ open, onClose, onSave, rawMaterial }) => {
         );
     }
 
-    if (suppliersError || brandsError) {
+    if (suppliersError) {
         return (
             <Dialog open={open} onClose={onClose}>
                 <DialogTitle>Error</DialogTitle>
                 <DialogContent>
                     {suppliersError && <Alert severity="error">{suppliersError}</Alert>}
-                    {brandsError && <Alert severity="error">{brandsError}</Alert>}
                 </DialogContent>
             </Dialog>
         );
@@ -130,47 +146,32 @@ const RawMaterialForm = ({ open, onClose, onSave, rawMaterial }) => {
                     </Select>
                 </FormControl>
                 <TextField margin="dense" name="batch_number" label="Número de Lote" type="text" fullWidth value={formData.batch_number || ''} onChange={handleChange} />
-                <FormControl fullWidth margin="dense">
-                    <InputLabel>Marcas</InputLabel>
-                    <Select
-                        name="brands"
-                        multiple
-                        value={formData.brands || []}
-                        onChange={handleChange}
-                        label="Marcas"
-                    >
-                        {brandsList.map((brand) => (
-                            <MenuItem key={brand.id} value={brand.id}>
-                                {brand.name}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
+                <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
+                    <FormControl fullWidth margin="dense">
+                        <InputLabel>Marca</InputLabel>
+                        <Select
+                            name="brand"
+                            value={formData.brand || ''}
+                            onChange={handleChange}
+                            label="Marca"
+                        >
+                            {brandsList.map((brand) => (
+                                <MenuItem key={brand.id} value={brand.id}>
+                                    {brand.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                    <IconButton onClick={onNewBrand} color="primary">
+                        <AddIcon />
+                    </IconButton>
+                </Box>
                 <TextField margin="dense" name="cost" label="Costo" type="number" fullWidth value={formData.cost} onChange={handleChange} />
                 <TextField margin="dense" name="current_stock" label="Stock Actual" type="number" fullWidth value={formData.current_stock || ''} onChange={handleChange} />
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Cancelar</Button>
                 <Button onClick={handleSubmit}>Guardar</Button>
-            </DialogActions>
-        </Dialog>
-    );
-};
-
-// QR Code Display Dialog Component
-const QrCodeDisplayDialog = ({ open, onClose, qrCodeData }) => {
-    return (
-        <Dialog open={open} onClose={onClose}>
-            <DialogTitle>Código QR de Materia Prima</DialogTitle>
-            <DialogContent>
-                {qrCodeData ? (
-                    <img src={`data:image/png;base64,${qrCodeData}`} alt="QR Code" style={{ width: '100%', height: 'auto' }} />
-                ) : (
-                    <Typography>No hay datos de QR disponibles.</Typography>
-                )}
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose}>Cerrar</Button>
             </DialogActions>
         </Dialog>
     );
@@ -185,12 +186,14 @@ const RawMaterialList = () => {
     const [selectedRawMaterial, setSelectedRawMaterial] = useState(null);
     const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
     const [qrCodeData, setQrCodeData] = useState(null);
+    const [isBrandFormOpen, setIsBrandFormOpen] = useState(false);
+    const [brandCreated, setBrandCreated] = useState(false);
     const { tenantId } = useAuth();
 
     const handleGenerateQrCode = async (rawMaterial) => {
         try {
             setLoading(true);
-            const response = await api.create(`/raw-materials/${rawMaterial.id}/generate_qr_code/`, {});
+            const response = await api.create(`/materia-prima-proveedores/${rawMaterial.id}/generate_qr_code/`, {});
             setQrCodeData(response.qr_code_data);
             setIsQrDialogOpen(true);
             setError(null);
@@ -235,7 +238,6 @@ const RawMaterialList = () => {
     const handleSave = async (formData) => {
         try {
             if (selectedRawMaterial) {
-                // Editing existing MateriaPrimaProveedor
                 const rawMaterialUpdateData = {
                     name: formData.name,
                     description: formData.description,
@@ -248,13 +250,12 @@ const RawMaterialList = () => {
                     supplier: formData.supplier,
                     cost: formData.cost,
                     current_stock: formData.current_stock,
-                    brands: formData.brands,
-                    raw_material: selectedRawMaterial.raw_material, // re-associate the raw_material
+                    brand: formData.brand,
+                    raw_material: selectedRawMaterial.raw_material, 
                 };
                 await api.update('/materia-prima-proveedores/', selectedRawMaterial.id, materiaPrimaProveedorUpdateData);
 
             } else {
-                // Creating new RawMaterial and MateriaPrimaProveedor
                 const rawMaterialData = {
                     name: formData.name,
                     description: formData.description,
@@ -268,7 +269,7 @@ const RawMaterialList = () => {
                     supplier: formData.supplier,
                     cost: formData.cost,
                     current_stock: formData.current_stock,
-                    brands: formData.brands,
+                    brand: formData.brand,
                 };
                 await api.create('/materia-prima-proveedores/', materiaPrimaProveedorData);
             }
@@ -293,6 +294,17 @@ const RawMaterialList = () => {
                 setError('Error al eliminar la materia prima.');
                 console.error(err);
             }
+        }
+    };
+
+    const handleSaveNewBrand = async (brandData) => {
+        try {
+            await api.create('/brands/', brandData);
+            setIsBrandFormOpen(false);
+            setBrandCreated(!brandCreated); // Toggle to trigger re-fetch in form
+        } catch (err) {
+            // Improved error handling can be added here
+            console.error("Error creating brand", err);
         }
     };
 
@@ -351,14 +363,23 @@ const RawMaterialList = () => {
                 open={isFormOpen} 
                 onClose={handleCloseForm} 
                 onSave={handleSave} 
-                rawMaterial={selectedRawMaterial} 
+                rawMaterial={selectedRawMaterial}
+                onNewBrand={() => setIsBrandFormOpen(true)}
+                onBrandCreated={brandCreated}
             />}
+
+            <BrandForm 
+                open={isBrandFormOpen}
+                onClose={() => setIsBrandFormOpen(false)}
+                onSave={handleSaveNewBrand}
+            />
 
             {isQrDialogOpen && (
                 <QrCodeDisplayDialog
                     open={isQrDialogOpen}
                     onClose={() => setIsQrDialogOpen(false)}
                     qrCodeData={qrCodeData}
+                    title="Código QR de Materia Prima"
                 />
             )}
         </Box>

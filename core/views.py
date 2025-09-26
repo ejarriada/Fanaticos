@@ -1,4 +1,5 @@
 import datetime
+import json
 from django.utils import timezone
 import uuid
 import qrcode
@@ -164,6 +165,34 @@ class ProductionOrderViewSet(TenantAwareViewSet):
             )
             inventory_item.quantity += item.quantity
             inventory_item.save()
+
+    @action(detail=True, methods=['post'])
+    def generate_qr_code(self, request, pk=None):
+        production_order = self.get_object()
+        
+        qr_data_str = (
+            f"OP ID: {production_order.id}\n"
+            f"Tipo: {production_order.op_type}\n"
+            f"Producto Base: {production_order.base_product.name if production_order.base_product else 'N/A'}\n"
+            f"Estado: {production_order.status}"
+        )
+
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(qr_data_str)
+        qr.make(fit=True)
+
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        qr_code_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+        return Response({'qr_code_data': qr_code_base64}, status=status.HTTP_200_OK)
+
 class RawMaterialViewSet(TenantAwareViewSet):
     queryset = RawMaterial.objects.all()
     serializer_class = RawMaterialSerializer
@@ -185,7 +214,21 @@ class MateriaPrimaProveedorViewSet(TenantAwareViewSet):
     @action(detail=True, methods=['post'])
     def generate_qr_code(self, request, pk=None):
         sourced_material = self.get_object()
-        qr_data = f"ID: {sourced_material.id}\nMaterial: {sourced_material.raw_material.name}\nProveedor: {sourced_material.supplier.name}\nLote: {sourced_material.batch_number}"
+        raw_material = sourced_material.raw_material
+
+        # Calculate total stock for this raw material across all suppliers
+        total_stock = MateriaPrimaProveedor.objects.filter(
+            raw_material=raw_material,
+            tenant=sourced_material.tenant
+        ).aggregate(total=Sum('current_stock'))['total'] or 0
+
+        qr_data_str = (
+            f"Material: {raw_material.name}\n"
+            f"Proveedor: {sourced_material.supplier.name}\n"
+            f"Lote: {sourced_material.batch_number}\n"
+            f"Stock del Lote: {sourced_material.current_stock}\n"
+            f"Stock Total (Material): {total_stock}"
+        )
 
         qr = qrcode.QRCode(
             version=1,
@@ -193,7 +236,7 @@ class MateriaPrimaProveedorViewSet(TenantAwareViewSet):
             box_size=10,
             border=4,
         )
-        qr.add_data(qr_data)
+        qr.add_data(qr_data_str)
         qr.make(fit=True)
 
         img = qr.make_image(fill_color="black", back_color="white")
@@ -317,7 +360,13 @@ class InventoryViewSet(TenantAwareViewSet):
         return Response({'message': 'Stock transferred successfully.'}, status=status.HTTP_200_OK)
 
 class SupplierViewSet(TenantAwareViewSet): queryset = Supplier.objects.all(); serializer_class = SupplierSerializer
-class PurchaseOrderViewSet(TenantAwareViewSet): queryset = PurchaseOrder.objects.all(); serializer_class = PurchaseOrderSerializer
+class PurchaseOrderViewSet(TenantAwareViewSet):
+    queryset = PurchaseOrder.objects.all()
+    serializer_class = PurchaseOrderSerializer
+
+    def perform_create(self, serializer):
+        tenant = self.get_tenant()
+        serializer.save(tenant=tenant, user=self.request.user)
 class PurchaseOrderItemViewSet(TenantAwareViewSet): queryset = PurchaseOrderItem.objects.all(); serializer_class = PurchaseOrderItemSerializer
 class AccountViewSet(TenantAwareViewSet): queryset = Account.objects.all(); serializer_class = AccountSerializer
 class CashRegisterViewSet(TenantAwareViewSet): queryset = CashRegister.objects.all(); serializer_class = CashRegisterSerializer
