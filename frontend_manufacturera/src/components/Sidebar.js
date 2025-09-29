@@ -39,20 +39,20 @@ const Sidebar = ({ open, drawerWidth }) => {
     const modules = [
         { text: 'Presupuestos', icon: <DescriptionIcon />, path: '/presupuestos' },
         { text: 'Ventas', icon: <PointOfSaleIcon />, path: '/ventas' },
-        { text: 'Remitos', icon: <ReceiptIcon />, path: '/remitos' },
+        { text: 'Gestión de Clientes', icon: <PeopleIcon />, path: '/clientes' },
         { text: 'Notas de Pedido', icon: <DescriptionIcon />, path: '/notas-de-pedido' },
         { text: 'Órdenes de Producción', icon: <ProductionQuantityLimitsIcon />, path: '/ordenes-de-produccion' },
         { text: 'Seguimiento de Producción', icon: <TimelineIcon />, path: '/seguimiento-produccion' },
-        { text: 'Inventario', icon: <InventoryIcon />, path: '/inventory' }, // Keep this one, remove others
-        { text: 'Gestión de Productos', icon: <ProductionQuantityLimitsIcon />, path: '/products' }, // Added this line
-        { text: 'Materia Prima', icon: <ScienceIcon />, path: '/materias-primas' },
+        { text: 'Remitos', icon: <ReceiptIcon />, path: '/remitos' },
+        { text: 'Inventario', icon: <InventoryIcon />, path: '/inventory' },
         { text: 'Procesos', icon: <SettingsIcon />, path: '/processes' },
+        { text: 'Proveedores', icon: <LocalShippingIcon />, path: '/proveedores' },
+        { text: 'Materia Prima', icon: <ScienceIcon />, path: '/materias-primas' },
+        { text: 'Gestión de Productos', icon: <ProductionQuantityLimitsIcon />, path: '/products' },
         { text: 'Administración', icon: <SettingsIcon />, path: '/administracion' },
-        { text: 'Gestión de Clientes', icon: <PeopleIcon />, path: '/clientes' },
         { text: 'Recursos Humanos', icon: <GroupIcon />, path: '/recursos-humanos' },
         { text: 'Contable/Finanzas', icon: <MonetizationOnIcon />, path: '/contable-finanzas' },
         { text: 'Informes', icon: <BarChartIcon />, path: '/reports' },
-        { text: 'Proveedores', icon: <LocalShippingIcon />, path: '/proveedores' },
     ];
 
     return (
