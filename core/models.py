@@ -251,6 +251,8 @@ class Sale(TenantAwareModel):
 class SaleItem(TenantAwareModel):
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
+    size = models.ForeignKey(Size, on_delete=models.SET_NULL, null=True, blank=True)  # NUEVO
+    color = models.ForeignKey(Color, on_delete=models.SET_NULL, null=True, blank=True)  # NUEVO
     quantity = models.IntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)

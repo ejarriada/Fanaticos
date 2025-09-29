@@ -133,6 +133,35 @@ class SimpleProductSerializer(TenantAwareSerializer):
 class SaleItemSerializer(TenantAwareSerializer):
     """Serializador de Item de Venta con detalles del producto anidados."""
     product = SimpleProductSerializer(read_only=True)
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(), 
+        source='product', 
+        write_only=True
+    )
+    size = SizeSerializer(read_only=True)
+    size_id = serializers.PrimaryKeyRelatedField(
+        queryset=Size.objects.all(),
+        source='size',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
+    color = ColorSerializer(read_only=True)
+    color_id = serializers.PrimaryKeyRelatedField(
+        queryset=Color.objects.all(),
+        source='color',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
+
+    class Meta(TenantAwareSerializer.Meta):
+        model = SaleItem
+        fields = ['id', 'product', 'product_id', 'size', 'size_id', 'color', 'color_id', 'quantity', 'unit_price', 'cost']
+
+class SaleItemSerializer(TenantAwareSerializer):
+    """Serializador de Item de Venta con detalles del producto anidados."""
+    product = SimpleProductSerializer(read_only=True)
 
     class Meta(TenantAwareSerializer.Meta):
         model = SaleItem

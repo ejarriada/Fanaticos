@@ -5,6 +5,7 @@ import uuid
 import qrcode
 import base64
 from io import BytesIO
+from decimal import Decimal
 from rest_framework import viewsets, status
 from rest_framework.views import APIView
 from rest_framework.decorators import action
@@ -439,13 +440,27 @@ class QuotationViewSet(TenantAwareViewSet):
 
         total_sale_amount = 0
         for quotation_item in quotation.items.all():
-            calculated_cost = quotation_item.design.calculated_cost
-            recalculated_unit_price = calculated_cost * (1 + 0.20)
+            # Validar que el producto tenga diseño
+            if not quotation_item.product:
+                return Response(
+                    {'error': f'Item {quotation_item.id} no tiene producto asociado.'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not quotation_item.product.design:
+                return Response(
+                    {'error': f'El producto {quotation_item.product.name} no tiene diseño asociado.'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Corregido: acceder al design a través del product
+            calculated_cost = quotation_item.product.design.calculated_cost
+            recalculated_unit_price = calculated_cost * Decimal('1.20')
             recalculated_cost = calculated_cost
             
             sale_item_data = {
                 'sale': sale.id,
-                'design': quotation_item.design.id,
+                'product': quotation_item.product.id,
                 'quantity': quotation_item.quantity,
                 'unit_price': recalculated_unit_price,
                 'cost': recalculated_cost,
@@ -455,7 +470,6 @@ class QuotationViewSet(TenantAwareViewSet):
             sale_item_serializer.is_valid(raise_exception=True)
             sale_item_serializer.save()
             total_sale_amount += (quotation_item.quantity * recalculated_unit_price)
-
         sale.total_amount = total_sale_amount
         sale.save()
 
@@ -471,16 +485,55 @@ class DeliveryNoteViewSet(TenantAwareViewSet):
 
     def perform_create(self, serializer):
         with transaction.atomic():
-            # First, validate that there is enough stock for all items.
+            # Get or create factory local
             factory_local, created = Local.objects.get_or_create(
                 name='Fábrica',
                 tenant=self.get_tenant()
             )
             
+            # Get the sale from validated_data to validate quantities
+            sale = serializer.validated_data.get('sale')
+            
+            if not sale:
+                raise serializers.ValidationError("Se requiere especificar una venta.")
+            
+            # Validate each item
             for item_data in serializer.validated_data['items']:
                 product = item_data['product']
                 quantity_to_deduct = item_data['quantity']
                 
+                # NUEVA VALIDACIÓN: Verificar que no se exceda la cantidad vendida
+                # Cantidad total vendida de este producto en esta venta
+                sold_quantity = SaleItem.objects.filter(
+                    sale=sale, 
+                    product=product,
+                    tenant=self.get_tenant()
+                ).aggregate(total=Sum('quantity'))['total'] or 0
+                
+                if sold_quantity == 0:
+                    raise serializers.ValidationError(
+                        f"El producto '{product.name}' no está en la venta."
+                    )
+                
+                # Cantidad ya entregada en remitos anteriores
+                delivered_quantity = DeliveryNoteItem.objects.filter(
+                    delivery_note__sale=sale,
+                    product=product,
+                    delivery_note__tenant=self.get_tenant()
+                ).aggregate(total=Sum('quantity'))['total'] or 0
+                
+                # Calcular lo que queda por entregar
+                remaining_quantity = sold_quantity - delivered_quantity
+                
+                # Validar que no se exceda
+                if quantity_to_deduct > remaining_quantity:
+                    raise serializers.ValidationError(
+                        f"Producto '{product.name}': "
+                        f"Cantidad a entregar ({quantity_to_deduct}) excede lo pendiente ({remaining_quantity}). "
+                        f"Vendido: {sold_quantity}, Ya entregado: {delivered_quantity}"
+                    )
+                
+                # VALIDACIÓN ORIGINAL: Verificar stock disponible
                 try:
                     inventory_item = Inventory.objects.get(
                         product=product,
@@ -489,13 +542,14 @@ class DeliveryNoteViewSet(TenantAwareViewSet):
                     )
                     if inventory_item.quantity < quantity_to_deduct:
                         raise serializers.ValidationError(
-                            f"Stock insuficiente para el producto {product.name}. Requerido: {quantity_to_deduct}, Disponible: {inventory_item.quantity}."
+                            f"Stock insuficiente para el producto {product.name}. "
+                            f"Requerido: {quantity_to_deduct}, Disponible: {inventory_item.quantity}."
                         )
                 except Inventory.DoesNotExist:
                     raise serializers.ValidationError(
                         f"No hay registro de inventario para el producto {product.name} en la Fábrica."
                     )
-
+            
             # If all validations pass, proceed to create the delivery note and deduct stock.
             delivery_note = serializer.save(tenant=self.get_tenant())
             for item in delivery_note.items.all():
