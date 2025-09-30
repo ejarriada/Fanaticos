@@ -19,14 +19,14 @@ const Navbar = ({ handleDrawerToggle }) => {
             sx={{
                 width: '100%', // CAMBIO: siempre 100%, no se ajusta al sidebar
                 zIndex: (theme) => theme.zIndex.drawer + 1, // CAMBIO: navbar sobre el sidebar
-                height: '64px',
+                height: '48px',
                 minHeight: '48px',
             }}
         >
             <Toolbar 
                 sx={{ 
                     minHeight: '48px !important',
-                    height: '64px',
+                    height: '48px',
                     px: 2
                 }}
             >

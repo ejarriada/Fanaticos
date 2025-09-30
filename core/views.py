@@ -369,42 +369,59 @@ class SupplierViewSet(TenantAwareViewSet):
         supplier = self.get_object()
         tenant = self.get_tenant()
 
-        purchases = PurchaseOrder.objects.filter(supplier=supplier, tenant=tenant).annotate(
-            calculated_total=Sum(F('items__quantity') * F('items__unit_price'))
+        # Obtener todas las compras del proveedor (movimientos DEBE - negativos)
+        purchases = PurchaseOrder.objects.filter(
+            supplier=supplier, 
+            tenant=tenant
         ).annotate(
-            type=models.Value('Compra', output_field=models.CharField()),
-            detail=F('id'),
-            amount_val=ExpressionWrapper(F('calculated_total') * -1, output_field=DecimalField())
-        ).values('id', 'type', 'detail', 'order_date', 'amount_val')
-
-        payments = Payment.objects.filter(supplier=supplier, tenant=tenant).annotate(
-            type=models.Value('Pago', output_field=models.CharField()),
-            detail=F('payment_method'),
-            amount_val=F('amount')
-        ).values('id', 'type', 'detail', 'payment_date', 'amount_val')
-
-        # Rename date fields to be consistent
-        purchases = purchases.annotate(date=F('order_date')).values('id', 'type', 'detail', 'date', 'amount_val')
-        payments = payments.annotate(date=F('payment_date')).values('id', 'type', 'detail', 'date', 'amount_val')
-        
-        # Combine and sort
-        combined_movements = sorted(
-            list(purchases) + list(payments),
-            key=lambda x: x['date']
+            calculated_total=Sum(F('items__quantity') * F('items__unit_price'))
         )
 
-        # Calculate balance
-        balance = 0
+        # Obtener todos los pagos al proveedor (movimientos HABER - positivos)
+        payments = Payment.objects.filter(
+            purchase_order__supplier=supplier,
+            purchase_order__tenant=tenant
+        )
+
+        # Crear lista de movimientos
+        movements = []
+        
+        # Agregar compras como DEBE (negativo)
+        for purchase in purchases:
+            movements.append({
+                'id': f"C-{purchase.id}",
+                'type': 'Compra',
+                'detail': f"Orden de Compra #{purchase.id}",
+                'amount': -(purchase.calculated_total or 0),  # Negativo porque es deuda
+                'date': purchase.order_date
+            })
+        
+        # Agregar pagos como HABER (positivo)
+        for payment in payments:
+            movements.append({
+                'id': f"P-{payment.id}",
+                'type': 'Pago',
+                'detail': f"Pago {payment.payment_method}",
+                'amount': payment.amount,  # Positivo porque reduce la deuda
+                'date': payment.date
+            })
+
+        # Ordenar por fecha
+        movements.sort(key=lambda x: x['date'])
+
+        # Calcular balance acumulado
+        balance = Decimal('0.00')
         movements_with_balance = []
-        for movement in combined_movements:
-            balance += movement['amount_val']
+        
+        for movement in movements:
+            balance += Decimal(str(movement['amount']))
             movements_with_balance.append({
                 'id': movement['id'],
                 'type': movement['type'],
-                'detail': f"{movement['type']} #{movement['detail']}",
-                'amount': movement['amount_val'],
-                'balance': balance,
-                'date': movement['date']
+                'detail': movement['detail'],
+                'amount': float(movement['amount']),
+                'balance': float(balance),
+                'date': movement['date'].strftime('%Y-%m-%d')
             })
 
         return Response(movements_with_balance)
@@ -434,6 +451,228 @@ class ClientViewSet(TenantAwareViewSet):
         ).aggregate(total_amount=Sum('amount'))['total_amount']
         
         return Response({'balance': balance or 0.00}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='account-movements')
+    def account_movements(self, request, pk=None):
+        from decimal import Decimal
+        client = self.get_object()
+        tenant = self.get_tenant()
+
+        # Obtener todas las ventas del cliente (movimientos DEBE)
+        sales = Sale.objects.filter(client=client, tenant=tenant)
+
+        # Obtener todos los pagos del cliente (movimientos HABER)
+        payments = Transaction.objects.filter(
+            related_sale__client=client,
+            tenant=tenant,
+            amount__gt=0
+        )
+
+        # Crear lista de movimientos
+        movements = []
+        
+        # Agregar ventas como DEBE (negativo)
+        for sale in sales:
+            movements.append({
+                'id': f"V-{sale.id}",
+                'type': 'Venta',
+                'detail': f"Venta #{sale.id}",
+                'amount': -float(sale.total_amount),
+                'date': sale.sale_date.date() if hasattr(sale.sale_date, 'date') else sale.sale_date,
+                'user': sale.user.email if sale.user else 'N/A'
+            })
+        
+        # Agregar pagos como HABER (positivo)
+        for payment in payments:
+            movements.append({
+                'id': f"P-{payment.id}",
+                'type': 'Pago',
+                'detail': payment.description or 'Pago',
+                'amount': float(payment.amount),
+                'date': payment.date,
+                'user': 'N/A'
+            })
+
+        # Ordenar por fecha
+        movements.sort(key=lambda x: x['date'])
+
+        # Calcular balance acumulado
+        balance = Decimal('0.00')
+        movements_with_balance = []
+        
+        for movement in movements:
+            balance += Decimal(str(movement['amount']))
+            movements_with_balance.append({
+                'id': movement['id'],
+                'type': movement['type'],
+                'detail': movement['detail'],
+                'amount': movement['amount'],
+                'balance': float(balance),
+                'date': movement['date'].strftime('%Y-%m-%d') if hasattr(movement['date'], 'strftime') else str(movement['date']),
+                'user': movement['user']
+            })
+
+        return Response(movements_with_balance)
+
+    @action(detail=True, methods=['post'], url_path='register-payment')
+    def register_payment(self, request, pk=None):
+        from decimal import Decimal
+        from django.db import transaction as db_transaction
+        
+        client = self.get_object()
+        tenant = self.get_tenant()
+        
+        # Obtener datos del request
+        sale_id = request.data.get('sale_id')
+        amount = Decimal(str(request.data.get('amount', 0)))
+        payment_method_id = request.data.get('payment_method_id')
+        account_id = request.data.get('account_id')
+        cash_register_id = request.data.get('cash_register_id')
+        bank_id = request.data.get('bank_id')
+        description = request.data.get('description', '')
+        
+        # Validaciones
+        if not sale_id:
+            return Response({'error': 'Se debe especificar una venta'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if amount <= 0:
+            return Response({'error': 'El monto debe ser mayor a cero'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            sale = Sale.objects.get(id=sale_id, client=client, tenant=tenant)
+        except Sale.DoesNotExist:
+            return Response({'error': 'Venta no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            account = Account.objects.get(id=account_id, tenant=tenant)
+        except Account.DoesNotExist:
+            return Response({'error': 'Cuenta no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Calcular saldo pendiente de la venta
+        total_pagado = Transaction.objects.filter(
+            related_sale=sale,
+            tenant=tenant,
+            amount__gt=0
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        
+        saldo_pendiente = sale.total_amount - total_pagado
+        
+        if amount > saldo_pendiente:
+            return Response({
+                'error': f'El monto (${amount}) excede el saldo pendiente (${saldo_pendiente})'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Calcular costo financiero si aplica
+        costo_financiero = Decimal('0.00')
+        monto_neto = amount
+        
+        if payment_method_id:
+            try:
+                payment_method = PaymentMethodType.objects.get(id=payment_method_id, tenant=tenant)
+                
+                # Buscar regla de costo financiero (considerando banco si se especifica)
+                financial_rule_query = FinancialCostRule.objects.filter(
+                    payment_method=payment_method,
+                    tenant=tenant
+                )
+                
+                if bank_id:
+                    try:
+                        bank = Bank.objects.get(id=bank_id, tenant=tenant)
+                        # Priorizar regla específica del banco
+                        financial_rule = financial_rule_query.filter(bank=bank).first()
+                        if not financial_rule:
+                            # Si no hay regla específica, usar la general
+                            financial_rule = financial_rule_query.filter(bank__isnull=True).first()
+                    except Bank.DoesNotExist:
+                        financial_rule = financial_rule_query.filter(bank__isnull=True).first()
+                else:
+                    financial_rule = financial_rule_query.filter(bank__isnull=True).first()
+                
+                if financial_rule:
+                    costo_financiero = amount * (financial_rule.percentage / Decimal('100'))
+                    monto_neto = amount - costo_financiero
+            
+            except PaymentMethodType.DoesNotExist:
+                pass
+        
+        # Crear transacción
+        with db_transaction.atomic():
+            # Transacción principal (cobro)
+            trans = Transaction.objects.create(
+                tenant=tenant,
+                description=description or f"Cobro de Venta #{sale.id}",
+                amount=amount,
+                account=account,
+                cash_register_id=cash_register_id if cash_register_id else None,
+                related_sale=sale
+            )
+            
+            # Si hay costo financiero, crear transacción de egreso
+            if costo_financiero > 0:
+                egreso_account = Account.objects.filter(
+                    tenant=tenant,
+                    account_type='Egreso'
+                ).filter(
+                    models.Q(name__icontains='financiero') | 
+                    models.Q(name__icontains='comision') |
+                    models.Q(name__icontains='costo')
+                ).first()
+                
+                if not egreso_account:
+                    # Si no existe, crear una cuenta de egresos genérica
+                    egreso_account = Account.objects.filter(
+                        tenant=tenant,
+                        account_type='Egreso'
+                    ).first()
+                
+                if egreso_account:
+                    Transaction.objects.create(
+                        tenant=tenant,
+                        description=f"Costo financiero - {payment_method.name}",
+                        amount=-costo_financiero,
+                        account=egreso_account,
+                        related_sale=sale
+                    )
+        
+        return Response({
+            'message': 'Cobro registrado exitosamente',
+            'transaction_id': trans.id,
+            'monto_cobrado': float(amount),
+            'costo_financiero': float(costo_financiero),
+            'monto_neto': float(monto_neto),
+            'saldo_restante': float(saldo_pendiente - amount)
+        }, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['get'], url_path='pending-sales')
+    def pending_sales(self, request, pk=None):
+        from decimal import Decimal
+        client = self.get_object()
+        tenant = self.get_tenant()
+        
+        sales = Sale.objects.filter(client=client, tenant=tenant).order_by('-sale_date')
+        
+        sales_with_balance = []
+        for sale in sales:
+            total_pagado = Transaction.objects.filter(
+                related_sale=sale,
+                tenant=tenant,
+                amount__gt=0
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            
+            saldo_pendiente = sale.total_amount - total_pagado
+            
+            if saldo_pendiente > 0:
+                sales_with_balance.append({
+                    'id': sale.id,
+                    'sale_date': sale.sale_date.strftime('%Y-%m-%d'),
+                    'total_amount': float(sale.total_amount),
+                    'paid_amount': float(total_pagado),
+                    'pending_balance': float(saldo_pendiente),
+                    'description': f"Venta #{sale.id} - {sale.sale_date.strftime('%d/%m/%Y')}"
+                })
+        
+        return Response(sales_with_balance)
 
 class ContactViewSet(TenantAwareViewSet):
     queryset = Contact.objects.all()

@@ -45,7 +45,6 @@ const Sidebar = ({ open, drawerWidth }) => {
         { text: 'Seguimiento de Producción', icon: <TimelineIcon />, path: '/seguimiento-produccion' },
         { text: 'Remitos', icon: <ReceiptIcon />, path: '/remitos' },
         { text: 'Inventario', icon: <InventoryIcon />, path: '/inventory' },
-        { text: 'Procesos', icon: <SettingsIcon />, path: '/processes' },
         { text: 'Proveedores', icon: <LocalShippingIcon />, path: '/proveedores' },
         { text: 'Materia Prima', icon: <ScienceIcon />, path: '/materias-primas' },
         { text: 'Gestión de Productos', icon: <ProductionQuantityLimitsIcon />, path: '/products' },

@@ -26,8 +26,8 @@ const CuentaCorrienteProveedor = () => {
         if (selectedSupplier) {
             const fetchMovements = async () => {
                 try {
-                    // TODO: Replace with the actual API endpoint for supplier account movements
-                    const data = await api.list(`/suppliers/${selectedSupplier}/account_movements/`);
+                    // CAMBIO AQUÍ: account_movements -> account-movements
+                    const data = await api.list(`/suppliers/${selectedSupplier}/account-movements/`);
                     setMovements(data.results || (Array.isArray(data) ? data : []));
                 } catch (error) {
                     console.error("Error fetching account movements:", error);

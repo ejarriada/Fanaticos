@@ -84,4 +84,7 @@ urlpatterns = [
     path('management/revenue-expenses/', RevenueExpensesView.as_view(), name='revenue-expenses'),
     path('management/projected-growth/', ProjectedGrowthView.as_view(), name='projected-growth'),
     path('suppliers/<int:pk>/account-movements/', SupplierViewSet.as_view({'get': 'account_movements'}), name='supplier-account-movements'),
+    path('clients/<int:pk>/account-movements/', ClientViewSet.as_view({'get': 'account_movements'}), name='client-account-movements'),
+    path('clients/<int:pk>/register-payment/', ClientViewSet.as_view({'post': 'register_payment'}), name='client-register-payment'),
+    path('clients/<int:pk>/pending-sales/', ClientViewSet.as_view({'get': 'pending_sales'}), name='client-pending-sales'),
 ]
