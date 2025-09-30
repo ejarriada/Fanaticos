@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, TextField, IconButton, CircularProgress, Alert, Box, Typography } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import CancelIcon from '@mui/icons-material/Cancel';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
+import SaleDetailsModal from './SaleDetailsModal';
+import EditSaleModal from './EditSaleModal';
 
 const SalesList = () => {
     const [sales, setSales] = useState([]);
@@ -12,6 +16,9 @@ const SalesList = () => {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const { tenantId } = useAuth();
+    const [selectedSale, setSelectedSale] = useState(null);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
 
     const fetchSales = async () => {
         try {
@@ -57,10 +64,43 @@ const SalesList = () => {
         }
     };
 
+    const handleViewDetails = (sale) => {
+        setSelectedSale(sale);
+        setShowDetailsModal(true);
+    };
+
     const handleEdit = (sale) => {
-        // For now, just log the sale to the console
-        console.log('Editando venta:', sale);
-        // We can implement a dialog or a separate page for editing later
+        setSelectedSale(sale);
+        setShowEditModal(true);
+    };
+
+    const handleCancel = async (sale) => {
+        if (window.confirm(`¿Está seguro de que desea anular la venta #${sale.id}?`)) {
+            try {
+                await api.update('/sales/', sale.id, { ...sale, status: 'Cancelada' });
+                fetchSales();
+            } catch (err) {
+                setError('Error al anular la venta.');
+                console.error(err);
+            }
+        }
+    };
+
+    const handleCloseModals = () => {
+        setShowDetailsModal(false);
+        setShowEditModal(false);
+        setSelectedSale(null);
+    };
+
+    const handleSaveEdit = async (updatedSale) => {
+        try {
+            await api.update('/sales/', updatedSale.id, updatedSale);
+            fetchSales();
+            handleCloseModals();
+        } catch (err) {
+            setError('Error al actualizar la venta.');
+            console.error(err);
+        }
     };
 
     return (
@@ -104,15 +144,56 @@ const SalesList = () => {
                         <TableBody>
                             {sales.map((sale) => (
                                 <TableRow key={sale.id}>
-                                    <TableCell>{sale.id}</TableCell><TableCell>{sale.items && sale.items.length > 0 
+                                    <TableCell>{sale.id}</TableCell>
+                                    <TableCell>
+                                        {sale.items && sale.items.length > 0 
                                             ? sale.items.map(item => item.product_name).join(', ') 
-                                            : 'N/A'}</TableCell><TableCell>{sale.client?.name || 'N/A'}</TableCell><TableCell>{sale.items ? sale.items.reduce((sum, item) => sum + item.quantity, 0) : 0}</TableCell><TableCell>${typeof sale.total_amount === 'number' ? sale.total_amount.toFixed(2) : parseFloat(sale.total_amount).toFixed(2)}</TableCell><TableCell>{new Date(sale.sale_date).toLocaleDateString()}</TableCell><TableCell>{sale.user?.email || 'N/A'}</TableCell><TableCell><IconButton onClick={() => handleEdit(sale)}><EditIcon /></IconButton><IconButton onClick={() => handleDelete(sale.id)}><DeleteIcon /></IconButton></TableCell>
+                                            : 'N/A'}
+                                    </TableCell>
+                                    <TableCell>{sale.client?.name || 'N/A'}</TableCell>
+                                    <TableCell>
+                                        {sale.items ? sale.items.reduce((sum, item) => sum + item.quantity, 0) : 0}
+                                    </TableCell>
+                                    <TableCell>
+                                        ${typeof sale.total_amount === 'number' 
+                                            ? sale.total_amount.toFixed(2) 
+                                            : parseFloat(sale.total_amount).toFixed(2)}
+                                    </TableCell>
+                                    <TableCell>{new Date(sale.sale_date).toLocaleDateString()}</TableCell>
+                                    <TableCell>{sale.user?.email || 'N/A'}</TableCell>
+                                    <TableCell>
+                                        <IconButton onClick={() => handleViewDetails(sale)} title="Ver detalles">
+                                            <VisibilityIcon />
+                                        </IconButton>
+                                        <IconButton onClick={() => handleEdit(sale)} title="Editar">
+                                            <EditIcon />
+                                        </IconButton>
+                                        <IconButton onClick={() => handleCancel(sale)} title="Anular" color="warning">
+                                            <CancelIcon />
+                                        </IconButton>
+                                        <IconButton onClick={() => handleDelete(sale.id)} title="Eliminar" color="error">
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
                 </TableContainer>
             )}
+
+            <SaleDetailsModal 
+                open={showDetailsModal}
+                onClose={handleCloseModals}
+                sale={selectedSale}
+            />
+
+            <EditSaleModal
+                open={showEditModal}
+                onClose={handleCloseModals}
+                sale={selectedSale}
+                onSave={handleSaveEdit}
+            />
         </Box>
     );
 };
