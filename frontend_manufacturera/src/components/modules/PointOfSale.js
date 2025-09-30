@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, TextField, Grid, Select, MenuItem, InputLabel, FormControl, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton, Typography, Box } from '@mui/material';
+import { Button, TextField, Grid, Select, MenuItem, InputLabel, FormControl, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton, Typography, Box, Divider } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
@@ -200,136 +200,184 @@ const PointOfSale = () => {
     };
 
     if (loading) {
-        return <CircularProgress />;
+        return (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+                <CircularProgress />
+            </Box>
+        );
     }
 
     return (
-        <Box p={3}> 
-            {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
-            <Grid container spacing={3}>
-                <Grid xs={12}>
-                    <Typography variant="h4">Punto de Venta</Typography>
-                </Grid>
+        <Box sx={{ maxWidth: 1400, margin: '0 auto', p: 3 }}> 
+            <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
+                Punto de Venta
+            </Typography>
 
-                <Grid xs={12}>
-                    <FormControl fullWidth>
-                        <InputLabel>Seleccionar Presupuesto (Opcional)</InputLabel>
-                        <Select
-                            value={selectedQuotationId}
-                            onChange={handleQuotationChange}
-                            label="Seleccionar Presupuesto (Opcional)"
+            {error && (
+                <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
+                    {error}
+                </Alert>
+            )}
+
+            {/* SECCIÓN: Presupuesto */}
+            <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+                <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 600, mb: 3, pb: 1.5, borderBottom: '2px solid #1976d2' }}>
+                    Cargar desde Presupuesto (Opcional)
+                </Typography>
+                <FormControl fullWidth>
+                    <InputLabel>Seleccionar Presupuesto</InputLabel>
+                    <Select
+                        value={selectedQuotationId}
+                        onChange={handleQuotationChange}
+                        label="Seleccionar Presupuesto"
+                    >
+                        <MenuItem value=""><em>Ninguno (Venta Manual)</em></MenuItem>
+                        {quotations.map((q) => (
+                            <MenuItem key={q.id} value={q.id}>
+                                {q.quotation_id} - {q.client.name}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+            </Paper>
+
+            {/* SECCIÓN: Agregar Producto */}
+            <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+                <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 600, mb: 3, pb: 1.5, borderBottom: '2px solid #1976d2' }}>
+                    Añadir Producto
+                </Typography>
+                <Grid container spacing={2} alignItems="flex-end">
+                    <Grid item xs={12} md={6}> {/* Cambié de 5 a 6 */}
+                        <FormControl fullWidth sx={{ minWidth: 300 }}> {/* NUEVO: ancho mínimo */}
+                            <InputLabel>Producto</InputLabel>
+                            <Select
+                                value={selectedProduct}
+                                onChange={(e) => setSelectedProduct(e.target.value)}
+                                label="Producto"
+                            >
+                                {products.map((product) => (
+                                    <MenuItem key={product.id} value={product.id}>
+                                        {product.name} - ${product.club_price}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={12} md={2}> {/* Cambié de 3 a 2 */}
+                        <TextField
+                            label="Cantidad"
+                            type="number"
+                            value={quantity}
+                            onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)}
+                            fullWidth
+                            inputProps={{ min: 1 }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={4}> {/* Se mantiene en 4 */}
+                        <Button 
+                            variant="contained" 
+                            color="primary" 
+                            onClick={handleAddProduct} 
+                            fullWidth
+                            sx={{ height: '56px' }}
                         >
-                            <MenuItem value=""><em>Ninguno (Venta Manual)</em></MenuItem>
-                            {quotations.map((q) => (
-                                <MenuItem key={q.id} value={q.id}>
-                                    {q.quotation_id} - {q.client.name}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                </Grid>
-
-                <Grid xs={12}>
-                    <Typography variant="h6" gutterBottom>Añadir Producto</Typography>
-                    <Grid container spacing={2}>
-                        <Grid xs={12} sm={6}>
-                            <FormControl fullWidth>
-                                <InputLabel>Producto</InputLabel>
-                                <Select
-                                    value={selectedProduct}
-                                    onChange={(e) => setSelectedProduct(e.target.value)}
-                                >
-                                    {products.map((product) => (
-                                        <MenuItem key={product.id} value={product.id}>
-                                            {product.name} - ${product.club_price}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                        <Grid xs={12} sm={3}>
-                            <TextField
-                                label="Cantidad"
-                                type="number"
-                                value={quantity}
-                                onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)}
-                                fullWidth
-                            />
-                        </Grid>
-                        <Grid xs={12} sm={3}>
-                            <Button variant="contained" color="primary" onClick={handleAddProduct} fullWidth>
-                                Añadir Producto
-                            </Button>
-                        </Grid>
+                            Añadir Producto
+                        </Button>
                     </Grid>
                 </Grid>
+            </Paper>
 
-                <Grid xs={12}>
-                    <Typography variant="h6" gutterBottom>Descuento</Typography>
-                    <Grid container spacing={2}>
-                        <Grid xs={12}>
-                            <TextField
-                                label="Motivo del Descuento"
-                                value={newSale.discount_reason}
-                                onChange={(e) => setNewSale({ ...newSale, discount_reason: e.target.value })}
-                                fullWidth
-                            />
-                        </Grid>
-                        <Grid xs={12} sm={4}>
-                            <TextField
-                                label="Monto a Descontar"
-                                type="number"
-                                value={newSale.discount_amount}
-                                onChange={handleDiscountAmountChange}
-                                fullWidth
-                            />
-                        </Grid>
-                        <Grid xs={12} sm={4}>
-                            <TextField
-                                label="Porcentaje de Descuento"
-                                type="number"
-                                value={newSale.discount_percentage}
-                                onChange={handleDiscountPercentageChange}
-                                fullWidth
-                            />
-                        </Grid>
-                        <Grid xs={12} sm={4}>
-                            <Button variant="contained" color="secondary" onClick={handleApplyDiscount} fullWidth>
-                                Aplicar Descuento
-                            </Button>
-                        </Grid>
+            {/* SECCIÓN: Descuento */}
+            <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+                <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 600, mb: 3, pb: 1.5, borderBottom: '2px solid #1976d2' }}>
+                    Descuento
+                </Typography>
+                <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                        <TextField
+                            label="Motivo del Descuento"
+                            value={newSale.discount_reason}
+                            onChange={(e) => setNewSale({ ...newSale, discount_reason: e.target.value })}
+                            fullWidth
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                        <TextField
+                            label="Monto a Descontar"
+                            type="number"
+                            value={newSale.discount_amount}
+                            onChange={handleDiscountAmountChange}
+                            fullWidth
+                            InputProps={{ startAdornment: <span style={{ marginRight: 4 }}>$</span> }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                        <TextField
+                            label="Porcentaje"
+                            type="number"
+                            value={newSale.discount_percentage.toFixed(2)}
+                            onChange={handleDiscountPercentageChange}
+                            fullWidth
+                            InputProps={{ endAdornment: <span style={{ marginLeft: 4 }}>%</span> }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                        <Button 
+                            variant="contained" 
+                            color="secondary" 
+                            onClick={handleApplyDiscount} 
+                            fullWidth
+                            sx={{ height: '56px' }}
+                        >
+                            Aplicar Descuento
+                        </Button>
                     </Grid>
                 </Grid>
+            </Paper>
 
-                <Grid xs={12}>
-                    <Typography variant="h6" gutterBottom>Productos en Venta</Typography>
-                    <TableContainer component={Paper}>
+            {/* SECCIÓN: Productos en Venta */}
+            <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+                <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 600, mb: 3, pb: 1.5, borderBottom: '2px solid #1976d2' }}>
+                    Productos en Venta
+                </Typography>
+                {newSale.saleItems.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                        No hay productos agregados. Añade productos desde la sección superior.
+                    </Typography>
+                ) : (
+                    <TableContainer>
                         <Table>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell>Producto</TableCell>
-                                    <TableCell>Cantidad</TableCell>
-                                    <TableCell>Precio Unitario</TableCell>
-                                    <TableCell>Subtotal</TableCell>
-                                    <TableCell>Acciones</TableCell>
+                                    <TableCell><strong>Producto</strong></TableCell>
+                                    <TableCell><strong>Cantidad</strong></TableCell>
+                                    <TableCell><strong>Precio Unit.</strong></TableCell>
+                                    <TableCell><strong>Subtotal</strong></TableCell>
+                                    <TableCell align="center"><strong>Acciones</strong></TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {newSale.saleItems.map((item) => (
                                     <TableRow key={item.product_id}>
                                         <TableCell>{item.name}</TableCell>
-                                        <TableCell>
+                                        <TableCell sx={{ width: '150px' }}>
                                             <TextField
                                                 type="number"
                                                 value={item.quantity}
                                                 onChange={(e) => handleUpdateQuantity(item.product_id, parseInt(e.target.value, 10) || 1)}
                                                 inputProps={{ min: 1 }}
+                                                size="small"
+                                                fullWidth
                                             />
                                         </TableCell>
-                                        <TableCell>${item.price}</TableCell>
-                                        <TableCell>${(item.price * item.quantity).toFixed(2)}</TableCell>
-                                        <TableCell>
-                                            <IconButton onClick={() => handleRemoveItem(item.product_id)}>
+                                        <TableCell>${item.price.toFixed(2)}</TableCell>
+                                        <TableCell><strong>${(item.price * item.quantity).toFixed(2)}</strong></TableCell>
+                                        <TableCell align="center">
+                                            <IconButton 
+                                                onClick={() => handleRemoveItem(item.product_id)}
+                                                color="error"
+                                                size="small"
+                                            >
                                                 <DeleteIcon />
                                             </IconButton>
                                         </TableCell>
@@ -338,56 +386,94 @@ const PointOfSale = () => {
                             </TableBody>
                         </Table>
                     </TableContainer>
-                </Grid>
+                )}
+            </Paper>
 
-                <Grid xs={12}>
-                    <Typography variant="h6" gutterBottom>Finalizar Venta</Typography>
-                    <Grid container spacing={2} alignItems="center">
-                        <Grid xs={12} sm={6}>
-                            <FormControl fullWidth>
-                                <InputLabel>Cliente</InputLabel>
-                                <Select
-                                    name="client"
-                                    value={newSale.client}
-                                    onChange={(e) => setNewSale({ ...newSale, client: e.target.value })}
-                                >
-                                    {clients.map((client) => (
-                                        <MenuItem key={client.id} value={client.id}>
-                                            {client.name}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                        <Grid xs={12} sm={6}>
-                            <FormControl fullWidth>
-                                <InputLabel>Método de Pago</InputLabel>
-                                <Select
-                                    name="payment_method"
-                                    value={newSale.payment_method}
-                                    onChange={(e) => setNewSale({ ...newSale, payment_method: e.target.value })}
-                                >
-                                    {paymentOptions.map((method) => (
-                                        <MenuItem key={method} value={method}>
-                                            {method}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                        <Grid xs={12} sm={6}>
-                            <Typography variant="h5">
-                                Monto Total: ${newSale.net_total_amount.toFixed(2)}
+            {/* SECCIÓN: Finalizar Venta */}
+            <Paper elevation={3} sx={{ p: 3, backgroundColor: '#f5f5f5' }}>
+                <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 600, mb: 3, pb: 1.5, borderBottom: '2px solid #1976d2' }}>
+                    Finalizar Venta
+                </Typography>
+                <Grid container spacing={3}>
+                    <Grid item xs={12} md={5}>
+                        <FormControl fullWidth sx={{ minWidth: 250 }}>
+                            <InputLabel>Cliente *</InputLabel>
+                            <Select
+                                name="client"
+                                value={newSale.client}
+                                onChange={(e) => setNewSale({ ...newSale, client: e.target.value })}
+                                label="Cliente *"
+                            >
+                                {clients.map((client) => (
+                                    <MenuItem key={client.id} value={client.id}>
+                                        {client.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                        <FormControl fullWidth sx={{ minWidth: 200 }}>
+                            <InputLabel>Método de Pago *</InputLabel>
+                            <Select
+                                name="payment_method"
+                                value={newSale.payment_method}
+                                onChange={(e) => setNewSale({ ...newSale, payment_method: e.target.value })}
+                                label="Método de Pago *"
+                            >
+                                {paymentOptions.map((method) => (
+                                    <MenuItem key={method} value={method}>
+                                        {method}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    
+                    <Grid item xs={12}>
+                        <Divider sx={{ my: 2 }} />
+                    </Grid>
+
+                    <Grid item xs={12} md={3}>
+                        <Box sx={{ textAlign: { xs: 'center', pt: 1 } }}>
+                            <Typography variant="body2" color="text.secondary">
+                                Total:
                             </Typography>
-                        </Grid>
-                        <Grid xs={12} sm={6}>
-                            <Button variant="contained" color="primary" onClick={handleSave} fullWidth>
-                                Guardar Venta
-                            </Button>
-                        </Grid>
+                            <Typography variant="h4">
+                                ${newSale.total_amount.toFixed(2)}
+                            </Typography>
+                            {newSale.applied_discount > 0 && (
+                                <>
+                                    <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                                        Descuento aplicado: -${newSale.applied_discount.toFixed(2)}
+                                    </Typography>
+                                    <Typography variant="h4" color="primary" sx={{ mt: 1 }}>
+                                        Total Final: ${newSale.net_total_amount.toFixed(2)}
+                                    </Typography>
+                                </>
+                            )}
+                            {newSale.applied_discount === 0 && (
+                                <Typography variant="h4" color="primary" sx={{ mt: 1 }}>
+                                    Total: ${newSale.net_total_amount.toFixed(2)}
+                                </Typography>
+                            )}
+                        </Box>
+                    </Grid>
+                    
+                    <Grid item xs={12} md={6}>
+                        <Button 
+                            variant="contained" 
+                            color="success" 
+                            onClick={handleSave} 
+                            fullWidth
+                            size="large"
+                            sx={{ height: '60px', fontSize: '1.1rem' }}
+                        >
+                            Guardar Venta
+                        </Button>
                     </Grid>
                 </Grid>
-            </Grid>
+            </Paper>
         </Box>
     );
 };

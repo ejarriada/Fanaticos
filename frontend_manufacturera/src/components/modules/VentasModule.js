@@ -34,7 +34,7 @@ const VentasModule = () => {
 
     return (
         <Box sx={{ width: '100%' }}>
-            <Typography variant="h4" sx={{ mb: 3 }}>Gestión de Ventas</Typography>
+            <Typography variant="h4" sx={{ mb: 3, mt: 0 }}>Gestión de Ventas</Typography>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                 <Tabs value={value} onChange={handleChange} aria-label="pestañas de ventas">
                     <Tab label="Nueva Venta" id="ventas-tab-0" />

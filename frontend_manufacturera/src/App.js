@@ -62,30 +62,31 @@ function MainApp() {
     return user ? (
       <Box sx={{ display: 'flex' }}>
         <CssBaseline />
-        <Navbar drawerWidth={drawerWidth} handleDrawerToggle={handleDrawerToggle} sidebarOpen={sidebarOpen} />
+        <Navbar handleDrawerToggle={handleDrawerToggle} />
         <Sidebar open={sidebarOpen} drawerWidth={drawerWidth} />
         <Box
           component="main"
           sx={{
             flexGrow: 1,
-            p: 3,
-            width: { sm: `calc(100% - ${sidebarOpen ? drawerWidth : 0}px)` },
-            ml: { sm: `${sidebarOpen ? drawerWidth : 0}px` },
+            px: 3,
+            pb: 3,
+            pt: '52px', // CAMBIO: 48px navbar + 4px mínimo
+            width: '100%',
             transition: (theme) =>
-                theme.transitions.create(['width', 'margin'], {
+                theme.transitions.create(['margin'], {
                     easing: theme.transitions.easing.sharp,
                     duration: theme.transitions.duration.enteringScreen,
                 }),
+            marginLeft: { sm: sidebarOpen ? `${drawerWidth}px` : 0 },
           }}
         >
-          <Toolbar />
           {children}
         </Box>
       </Box>
     ) : (
       <Navigate to="/login" />
     );
-  };
+};
 
   return (
     <div className="App">

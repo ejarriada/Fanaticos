@@ -63,6 +63,9 @@ const Sidebar = ({ open, drawerWidth }) => {
                 [`& .MuiDrawer-paper`]: {
                     width: drawerWidth,
                     boxSizing: 'border-box',
+                    marginTop: '48px',
+                    height: 'calc(100% - 48px)',
+                    zIndex: (theme) => theme.zIndex.drawer, // CAMBIO: zIndex normal
                     transition: (theme) =>
                         theme.transitions.create('transform', {
                             easing: theme.transitions.easing.sharp,
@@ -75,7 +78,6 @@ const Sidebar = ({ open, drawerWidth }) => {
             open={open}
             anchor="left"
         >
-            <Toolbar />
             <List>
                 {modules.map((module) => (
                     <ListItem key={module.text} disablePadding>

@@ -1,10 +1,10 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AppBar, Toolbar, IconButton, Typography, Button } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 
-const Navbar = ({ drawerWidth, handleDrawerToggle, sidebarOpen }) => {
+const Navbar = ({ handleDrawerToggle }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
 
@@ -14,33 +14,51 @@ const Navbar = ({ drawerWidth, handleDrawerToggle, sidebarOpen }) => {
     };
 
     return (
-        <AppBar 
+        <AppBar
             position="fixed"
             sx={{
-                width: { sm: `calc(100% - ${sidebarOpen ? drawerWidth : 0}px)` },
-                ml: { sm: `${sidebarOpen ? drawerWidth : 0}px` },
-                transition: (theme) =>
-                    theme.transitions.create(['width', 'margin'], {
-                        easing: theme.transitions.easing.sharp,
-                        duration: theme.transitions.duration.enteringScreen,
-                    }),
+                width: '100%', // CAMBIO: siempre 100%, no se ajusta al sidebar
+                zIndex: (theme) => theme.zIndex.drawer + 1, // CAMBIO: navbar sobre el sidebar
+                height: '64px',
+                minHeight: '48px',
             }}
         >
-            <Toolbar>
+            <Toolbar 
+                sx={{ 
+                    minHeight: '48px !important',
+                    height: '64px',
+                    px: 2
+                }}
+            >
                 <IconButton
                     color="inherit"
                     aria-label="open drawer"
                     edge="start"
                     onClick={handleDrawerToggle}
-                    sx={{ mr: 2 }}
+                    sx={{ mr: 2, p: 1 }}
+                    size="small"
                 >
-                    <MenuIcon />
+                    <MenuIcon fontSize="small" />
                 </IconButton>
                 <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-                    {/* No text here, as per user request */}
+                    {/* Espacio vacío */}
                 </Typography>
-                {user && <Typography variant="subtitle1" sx={{ mr: 2 }}>Bienvenido, {user.email}</Typography>}
-                <Button color="inherit" onClick={handleLogout}>Cerrar Sesión</Button>
+                {user && (
+                    <Typography 
+                        variant="body2" 
+                        sx={{ mr: 2, fontSize: '0.875rem' }}
+                    >
+                        Bienvenido, {user.email}
+                    </Typography>
+                )}
+                <Button 
+                    color="inherit" 
+                    onClick={handleLogout}
+                    size="small"
+                    sx={{ fontSize: '0.875rem', py: 0.5 }}
+                >
+                    Cerrar Sesión
+                </Button>
             </Toolbar>
         </AppBar>
     );
