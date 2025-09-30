@@ -1,23 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box, Paper, Table, TableBody, TableCell, TableContainer,
-    TableHead, TableRow, Typography
+    TableHead, TableRow, Typography, FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
-
-// Mock data for account status
-const mockAccountMovements = [
-    { id: 1, type: 'Compra', detail: 'Factura F-001', cashbox: '-', amount: -5000, balance: 1000, date: '2025-09-01' },
-    { id: 2, type: 'Pago', detail: 'Pago factura F-001', cashbox: 'Caja Principal', amount: 5000, balance: 6000, date: '2025-09-02' },
-    { id: 3, type: 'Compra', detail: 'Factura F-002', cashbox: '-', amount: -1500, balance: 4500, date: '2025-09-03' },
-];
+import * as api from '../../utils/api';
 
 const CuentaCorrienteProveedor = () => {
-    const [movements, setMovements] = useState(mockAccountMovements);
+    const [suppliers, setSuppliers] = useState([]);
+    const [selectedSupplier, setSelectedSupplier] = useState('');
+    const [movements, setMovements] = useState([]);
+
+    useEffect(() => {
+        const fetchSuppliers = async () => {
+            try {
+                const data = await api.list('/suppliers/');
+                setSuppliers(data.results || (Array.isArray(data) ? data : []));
+            } catch (error) {
+                console.error("Error fetching suppliers:", error);
+            }
+        };
+        fetchSuppliers();
+    }, []);
+
+    useEffect(() => {
+        if (selectedSupplier) {
+            const fetchMovements = async () => {
+                try {
+                    // TODO: Replace with the actual API endpoint for supplier account movements
+                    const data = await api.list(`/suppliers/${selectedSupplier}/account_movements/`);
+                    setMovements(data.results || (Array.isArray(data) ? data : []));
+                } catch (error) {
+                    console.error("Error fetching account movements:", error);
+                    setMovements([]); // Clear movements on error
+                }
+            };
+            fetchMovements();
+        } else {
+            setMovements([]);
+        }
+    }, [selectedSupplier]);
+
+    const handleSupplierChange = (event) => {
+        setSelectedSupplier(event.target.value);
+    };
 
     return (
         <Box sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>Cuenta Corriente de Proveedor</Typography>
-            {/* TODO: Add selector for supplier */}
+            
+            <FormControl fullWidth sx={{ mb: 3 }}>
+                <InputLabel>Seleccionar Proveedor</InputLabel>
+                <Select
+                    value={selectedSupplier}
+                    onChange={handleSupplierChange}
+                    label="Seleccionar Proveedor"
+                >
+                    <MenuItem value="">
+                        <em>Seleccione un proveedor</em>
+                    </MenuItem>
+                    {suppliers.map(s => (
+                        <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
+                    ))}
+                </Select>
+            </FormControl>
 
             <TableContainer component={Paper}>
                 <Table>
@@ -25,25 +70,29 @@ const CuentaCorrienteProveedor = () => {
                         <TableRow>
                             <TableCell>Tipo</TableCell>
                             <TableCell>Detalle</TableCell>
-                            <TableCell>Caja</TableCell>
                             <TableCell>Monto</TableCell>
                             <TableCell>Balance</TableCell>
                             <TableCell>Fecha</TableCell>
-                            <TableCell>Acciones</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {movements.map((mov) => (
-                            <TableRow key={mov.id}>
-                                <TableCell>{mov.type}</TableCell>
-                                <TableCell>{mov.detail}</TableCell>
-                                <TableCell>{mov.cashbox}</TableCell>
-                                <TableCell>${mov.amount}</TableCell>
-                                <TableCell>${mov.balance}</TableCell>
-                                <TableCell>{mov.date}</TableCell>
-                                <TableCell>{/* Actions like delete */}</TableCell>
+                        {movements.length > 0 ? (
+                            movements.map((mov) => (
+                                <TableRow key={mov.id}>
+                                    <TableCell>{mov.type}</TableCell>
+                                    <TableCell>{mov.detail}</TableCell>
+                                    <TableCell>${mov.amount}</TableCell>
+                                    <TableCell>${mov.balance}</TableCell>
+                                    <TableCell>{new Date(mov.date).toLocaleDateString()}</TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={5} align="center">
+                                    Seleccione un proveedor para ver sus movimientos.
+                                </TableCell>
                             </TableRow>
-                        ))}
+                        )}
                     </TableBody>
                 </Table>
             </TableContainer>

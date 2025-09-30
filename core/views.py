@@ -360,7 +360,54 @@ class InventoryViewSet(TenantAwareViewSet):
 
         return Response({'message': 'Stock transferred successfully.'}, status=status.HTTP_200_OK)
 
-class SupplierViewSet(TenantAwareViewSet): queryset = Supplier.objects.all(); serializer_class = SupplierSerializer
+class SupplierViewSet(TenantAwareViewSet):
+    queryset = Supplier.objects.all()
+    serializer_class = SupplierSerializer
+
+    @action(detail=True, methods=['get'], url_path='account-movements')
+    def account_movements(self, request, pk=None):
+        supplier = self.get_object()
+        tenant = self.get_tenant()
+
+        purchases = PurchaseOrder.objects.filter(supplier=supplier, tenant=tenant).annotate(
+            calculated_total=Sum(F('items__quantity') * F('items__unit_price'))
+        ).annotate(
+            type=models.Value('Compra', output_field=models.CharField()),
+            detail=F('id'),
+            amount_val=ExpressionWrapper(F('calculated_total') * -1, output_field=DecimalField())
+        ).values('id', 'type', 'detail', 'order_date', 'amount_val')
+
+        payments = Payment.objects.filter(supplier=supplier, tenant=tenant).annotate(
+            type=models.Value('Pago', output_field=models.CharField()),
+            detail=F('payment_method'),
+            amount_val=F('amount')
+        ).values('id', 'type', 'detail', 'payment_date', 'amount_val')
+
+        # Rename date fields to be consistent
+        purchases = purchases.annotate(date=F('order_date')).values('id', 'type', 'detail', 'date', 'amount_val')
+        payments = payments.annotate(date=F('payment_date')).values('id', 'type', 'detail', 'date', 'amount_val')
+        
+        # Combine and sort
+        combined_movements = sorted(
+            list(purchases) + list(payments),
+            key=lambda x: x['date']
+        )
+
+        # Calculate balance
+        balance = 0
+        movements_with_balance = []
+        for movement in combined_movements:
+            balance += movement['amount_val']
+            movements_with_balance.append({
+                'id': movement['id'],
+                'type': movement['type'],
+                'detail': f"{movement['type']} #{movement['detail']}",
+                'amount': movement['amount_val'],
+                'balance': balance,
+                'date': movement['date']
+            })
+
+        return Response(movements_with_balance)
 class PurchaseOrderViewSet(TenantAwareViewSet):
     queryset = PurchaseOrder.objects.all()
     serializer_class = PurchaseOrderSerializer

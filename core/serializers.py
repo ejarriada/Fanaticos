@@ -602,15 +602,25 @@ class PurchaseOrderSerializer(TenantAwareSerializer):
     items = PurchaseOrderItemSerializer(many=True)
     supplier_name = serializers.CharField(source='supplier.name', read_only=True)
     user_name = serializers.SerializerMethodField()
-    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    paid_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    total_amount = serializers.SerializerMethodField()
 
     class Meta(TenantAwareSerializer.Meta):
         model = PurchaseOrder
         fields = ['id', 'supplier', 'supplier_name', 'user', 'user_name', 'order_date', 'expected_delivery_date', 'status', 'total_amount', 'paid_amount', 'items']
 
+    def get_total_amount(self, obj):
+        return obj.items.aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or Decimal('0.00')
+
+    paid_amount = serializers.SerializerMethodField()
+
     def get_user_name(self, obj):
         return obj.user.first_name if obj.user else None
+
+    def get_total_amount(self, obj):
+        return obj.items.aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or Decimal('0.00')
+
+    def get_paid_amount(self, obj):
+        return obj.payments.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
     def create(self, validated_data):
         items_data = validated_data.pop('items')
