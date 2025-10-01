@@ -260,7 +260,7 @@ const NuevoRemitoForm = () => {
 
                     {formData.tipo === 'Venta' && (
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth required>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Cliente</InputLabel>
                                 <Select
                                     name="cliente"
@@ -280,7 +280,7 @@ const NuevoRemitoForm = () => {
 
                     {formData.tipo === 'Venta' && (
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth sx={{ minWidth: 200 }}>
                                 <InputLabel>Venta Asociada (Opcional)</InputLabel>
                                 <Select
                                     name="venta"
@@ -331,7 +331,7 @@ const NuevoRemitoForm = () => {
                     )}
 
                     <Grid item xs={12} md={6}>
-                        <FormControl fullWidth required>
+                        <FormControl fullWidth required sx={{ minWidth: 200 }}>
                             <InputLabel>Origen (Almacén)</InputLabel>
                             <Select
                                 name="origen"
@@ -349,7 +349,7 @@ const NuevoRemitoForm = () => {
                     </Grid>
 
                     <Grid item xs={12} md={6}>
-                        <FormControl fullWidth>
+                        <FormControl fullWidth sx={{ minWidth: 200 }}>
                             <InputLabel>Destino</InputLabel>
                             <Select
                                 name="destino"

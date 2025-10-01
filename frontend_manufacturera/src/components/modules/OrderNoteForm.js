@@ -83,7 +83,7 @@ const OrderNoteForm = ({ open, onClose, onSave, orderNote }) => {
             <DialogContent>
                 <Grid container spacing={2} sx={{ mt: 1 }}>
                     <Grid xs={12}>
-                        <FormControl fullWidth>
+                        <FormControl fullWidth sx={{ minWidth: 200 }}>
                             <InputLabel>Venta Asociada</InputLabel>
                             <Select
                                 value={formData.sale || ''}

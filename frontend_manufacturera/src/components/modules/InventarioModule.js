@@ -42,7 +42,7 @@ const InventarioModule = () => {
     useEffect(() => {
         const fetchLocales = async () => {
             try {
-                const data = await api.list('/locales/');
+                                                const data = await api.list('/locals/');
                 setLocales(data.results || (Array.isArray(data) ? data : []));
             } catch (err) {
                 console.error("Failed to fetch locales", err);
