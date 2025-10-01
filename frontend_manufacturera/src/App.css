@@ -45,7 +45,6 @@
 
 .MuiFormControl-root {
   margin-bottom: 0 !important;
-  min-width: 200px;
 }
 
 /* CRÍTICO: Asegurar que los labels no se superpongan */
