@@ -12,19 +12,41 @@ import * as api from '../../utils/api';
 
 // Form Dialog for Creating/Editing an Almacen (Warehouse)
 const AlmacenForm = ({ open, onClose, onSave, almacen }) => {
-    const [formData, setFormData] = useState({ name: '', address: '', phone_number: '' });
+    const [formData, setFormData] = useState({ name: '', factory: '' });
+    const [factories, setFactories] = useState([]);
+    const [loadingFactories, setLoadingFactories] = useState(true);
 
+    // Cargar fábricas primero
     useEffect(() => {
-        if (almacen) {
-            setFormData({
-                name: almacen.name || '',
-                address: almacen.address || '',
-                phone_number: almacen.phone_number || ''
-            });
-        } else {
-            setFormData({ name: '', address: '', phone_number: '' });
+        const fetchFactories = async () => {
+            try {
+                setLoadingFactories(true);
+                const data = await api.list('/factories/');
+                setFactories(data.results || (Array.isArray(data) ? data : []));
+            } catch (err) {
+                console.error('Error al cargar fábricas', err);
+            } finally {
+                setLoadingFactories(false);
+            }
+        };
+        if (open) {
+            fetchFactories();
         }
-    }, [almacen, open]);
+    }, [open]);
+
+    // Setear formData después de que las fábricas se carguen
+    useEffect(() => {
+        if (!loadingFactories) {
+            if (almacen) {
+                setFormData({
+                    name: almacen.name || '',
+                    factory: almacen.factory || ''
+                });
+            } else {
+                setFormData({ name: '', factory: '' });
+            }
+        }
+    }, [almacen, loadingFactories]);
 
     const handleFormChange = (e) => {
         const { name, value } = e.target;
@@ -39,13 +61,49 @@ const AlmacenForm = ({ open, onClose, onSave, almacen }) => {
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
             <DialogTitle>{almacen ? 'Editar Almacén' : 'Nuevo Almacén'}</DialogTitle>
             <DialogContent>
-                <TextField margin="dense" name="name" label="Nombre del Almacén" type="text" fullWidth value={formData.name} onChange={handleFormChange} required />
-                <TextField margin="dense" name="address" label="Dirección" type="text" fullWidth value={formData.address} onChange={handleFormChange} />
-                <TextField margin="dense" name="phone_number" label="Teléfono" type="text" fullWidth value={formData.phone_number} onChange={handleFormChange} />
+                {loadingFactories ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                        <CircularProgress />
+                    </Box>
+                ) : (
+                    <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <TextField 
+                            name="name" 
+                            label="Nombre del Almacén" 
+                            type="text" 
+                            fullWidth 
+                            value={formData.name} 
+                            onChange={handleFormChange} 
+                            required 
+                        />
+                        
+                        <FormControl fullWidth required>
+                            <InputLabel>Fábrica</InputLabel>
+                            <Select
+                                name="factory"
+                                value={formData.factory}
+                                label="Fábrica"
+                                onChange={handleFormChange}
+                            >
+                                <MenuItem value=""><em>Seleccione una fábrica</em></MenuItem>
+                                {factories.map((factory) => (
+                                    <MenuItem key={factory.id} value={factory.id}>
+                                        {factory.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Box>
+                )}
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Cancelar</Button>
-                <Button onClick={handleSubmit}>Guardar</Button>
+                <Button 
+                    onClick={handleSubmit} 
+                    disabled={loadingFactories || !formData.name || !formData.factory}
+                >
+                    Guardar
+                </Button>
             </DialogActions>
         </Dialog>
     );

@@ -1,186 +1,221 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Tab, Tabs, Typography, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button } from '@mui/material';
-import * as api from '../../utils/api'; // Import api utils
+import {
+    Box, Typography, Paper, Table, TableBody, 
+    TableCell, TableContainer, TableHead, TableRow, CircularProgress, 
+    Alert, Button, IconButton, Dialog, DialogTitle, DialogContent, 
+    DialogActions, TextField, FormControl, InputLabel, Select, MenuItem
+} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import * as api from '../../utils/api';
 
-import MateriaPrimaStock from './MateriaPrimaStock';
-import ProductosTerminadosStock from './ProductosTerminadosStock';
-import AlmacenesManagement from './AlmacenesManagement';
-import StockAdjustmentDialog from './StockAdjustmentDialog';
-import EditCostDialog from './EditCostDialog'; // Assuming this is created for editing cost
-import MoveStockDialog from './MoveStockDialog'; // Import the new move dialog
-
-function TabPanel(props) {
-    const { children, value, index, ...other } = props;
-
-    return (
-        <div
-            role="tabpanel"
-            hidden={value !== index}
-            id={`inventario-tabpanel-${index}`}
-            aria-labelledby={`inventario-tab-${index}`}
-            {...other}
-        >
-            {value === index && (
-                <Box>
-                    {children}
-                </Box>
-            )}
-        </div>
-    );
-}
-
-const InventarioModule = () => {
-    const [value, setValue] = useState(0);
-    const [isAdjustmentDialogOpen, setIsAdjustmentDialogOpen] = useState(false);
-    const [isEditCostDialogOpen, setIsEditCostDialogOpen] = useState(false);
-    const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
-    const [selectedItem, setSelectedItem] = useState(null);
-    const [locales, setLocales] = useState([]);
-    const [refreshKey, setRefreshKey] = useState(0);
-    const [error, setError] = useState(null);
+// Form Dialog for Creating/Editing an Almacen (Warehouse)
+const AlmacenForm = ({ open, onClose, onSave, almacen }) => {
+    const [formData, setFormData] = useState({ name: '', factory: '' });
+    const [factories, setFactories] = useState([]);
+    const [loadingFactories, setLoadingFactories] = useState(true);
 
     useEffect(() => {
-        const fetchLocales = async () => {
+        const fetchFactories = async () => {
             try {
-                                                const data = await api.list('/locals/');
-                setLocales(data.results || (Array.isArray(data) ? data : []));
+                setLoadingFactories(true);
+                const data = await api.list('/factories/');
+                setFactories(data.results || (Array.isArray(data) ? data : []));
             } catch (err) {
-                console.error("Failed to fetch locales", err);
+                console.error('Error al cargar fábricas', err);
+            } finally {
+                setLoadingFactories(false);
             }
         };
-        fetchLocales();
+        fetchFactories();
     }, []);
 
-    const handleChange = (event, newValue) => {
-        setValue(newValue);
+    useEffect(() => {
+        if (almacen) {
+            setFormData({
+                name: almacen.name || '',
+                factory: almacen.factory || ''
+            });
+        } else {
+            setFormData({ name: '', factory: '' });
+        }
+    }, [almacen, open]);
+
+    const handleFormChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleAdjustStock = (item) => {
-        setSelectedItem(item);
-        setIsAdjustmentDialogOpen(true);
+    const handleSubmit = () => {
+        onSave(formData);
     };
 
-    const handleCloseAdjustmentDialog = () => {
-        setIsAdjustmentDialogOpen(false);
-        setSelectedItem(null);
-        setRefreshKey(prev => prev + 1);
-    };
+    return (
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+            <DialogTitle>{almacen ? 'Editar Almacén' : 'Nuevo Almacén'}</DialogTitle>
+            <DialogContent>
+                <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <TextField 
+                        name="name" 
+                        label="Nombre del Almacén" 
+                        type="text" 
+                        fullWidth 
+                        value={formData.name} 
+                        onChange={handleFormChange} 
+                        required 
+                    />
+                    
+                    <FormControl fullWidth required>
+                        <InputLabel>Fábrica</InputLabel>
+                        <Select
+                            name="factory"
+                            value={formData.factory}
+                            label="Fábrica"
+                            onChange={handleFormChange}
+                            disabled={loadingFactories}
+                        >
+                            <MenuItem value=""><em>Seleccione una fábrica</em></MenuItem>
+                            {factories.map((factory) => (
+                                <MenuItem key={factory.id} value={factory.id}>
+                                    {factory.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </Box>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Cancelar</Button>
+                <Button onClick={handleSubmit} disabled={!formData.name || !formData.factory}>
+                    Guardar
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+};
 
-    const handleOpenEditCost = (item) => {
-        setSelectedItem(item);
-        setIsEditCostDialogOpen(true);
-    };
+const AlmacenesManagement = () => {
+    const [almacenes, setAlmacenes] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [selectedAlmacen, setSelectedAlmacen] = useState(null);
 
-    const handleCloseEditCostDialog = () => {
-        setIsEditCostDialogOpen(false);
-        setSelectedItem(null);
-    };
-
-    const handleSaveCost = async (id, costData) => {
+    const fetchAlmacenes = async () => {
         try {
-            await api.patch('/materia-prima-proveedores/', id, costData);
-            handleCloseEditCostDialog();
-            setRefreshKey(prev => prev + 1);
+            setLoading(true);
+            const data = await api.list('/locals/');
+            setAlmacenes(data.results || (Array.isArray(data) ? data : []));
+            setError(null);
         } catch (err) {
-            setError(`Error al actualizar el costo: ${err.message}`);
+            setError('Error al cargar los almacenes.');
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchAlmacenes();
+    }, []);
+
+    const handleOpenForm = (almacen = null) => {
+        setSelectedAlmacen(almacen);
+        setIsFormOpen(true);
+    };
+
+    const handleCloseForm = () => {
+        setSelectedAlmacen(null);
+        setIsFormOpen(false);
+    };
+
+    const handleSave = async (formData) => {
+        try {
+            if (selectedAlmacen) {
+                await api.update('/locals/', selectedAlmacen.id, formData);
+            } else {
+                await api.create('/locals/', formData);
+            }
+            fetchAlmacenes();
+            handleCloseForm();
+        } catch (err) {
+            const errorData = err.response?.data;
+            const errorMessage = errorData 
+                ? Object.entries(errorData).map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`).join('; ')
+                : 'Error al guardar el almacén.';
+            setError(errorMessage);
             console.error(err);
         }
     };
 
-    const handleOpenMoveDialog = (item) => {
-        setSelectedItem(item);
-        setIsMoveDialogOpen(true);
-    };
-
-    const handleCloseMoveDialog = () => {
-        setIsMoveDialogOpen(false);
-        setSelectedItem(null);
-    };
-
-    const handleSaveTransfer = async (id, transferData) => {
-        try {
-            await api.postAction('/inventories/', id, 'transfer-stock', transferData);
-            handleCloseMoveDialog();
-            setRefreshKey(prev => prev + 1);
-        } catch (err) {
-            setError(`Error al transferir stock: ${err.response?.data?.error || err.message}`);
-            console.error(err);
-        }
-    };
-
-    const handleDelete = async (id, type) => {
-        const confirmDelete = window.confirm('¿Está seguro de que desea eliminar este registro de stock?');
-        if (!confirmDelete) return;
-
-        const endpoint = type === 'raw' ? '/materia-prima-proveedores/' : '/inventories/';
-        
-        try {
-            await api.remove(endpoint, id);
-            setRefreshKey(prev => prev + 1);
-        } catch (err) {
-            setError(`Error al eliminar el registro: ${err.message}`);
-            console.error(err);
+    const handleDelete = async (id) => {
+        if (window.confirm('¿Está seguro de que desea eliminar este almacén? Esta acción no se puede deshacer.')) {
+            try {
+                await api.remove('/locals/', id);
+                fetchAlmacenes();
+            } catch (err) {
+                setError('Error al eliminar el almacén.');
+                console.error(err);
+            }
         }
     };
 
     return (
-        <Box sx={{ width: '100%' }}>
-            <Typography variant="h4" sx={{ mb: 3 }}>Gestión de Inventario</Typography>
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs value={value} onChange={handleChange} aria-label="pestañas de inventario">
-                    <Tab label="Stock Materia Prima" id="inventario-tab-0" />
-                    <Tab label="Stock Productos Terminados" id="inventario-tab-1" />
-                    <Tab label="Almacenes" id="inventario-tab-2" />
-                </Tabs>
+        <Box sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">Almacenes</Typography>
+                <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenForm()}>
+                    Nuevo Almacén
+                </Button>
             </Box>
-            <TabPanel value={value} index={0}>
-                <MateriaPrimaStock 
-                    onAdjustStock={handleAdjustStock} 
-                    onDelete={handleDelete} 
-                    onEdit={handleOpenEditCost} 
-                    refreshKey={refreshKey} 
-                />
-            </TabPanel>
-            <TabPanel value={value} index={1}>
-                <ProductosTerminadosStock 
-                    onAdjustStock={handleAdjustStock} 
-                    onDelete={handleDelete} 
-                    onMove={handleOpenMoveDialog} 
-                    refreshKey={refreshKey} 
-                />
-            </TabPanel>
-            <TabPanel value={value} index={2}>
-                <AlmacenesManagement />
-            </TabPanel>
+            
+            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-            {isAdjustmentDialogOpen && (
-                <StockAdjustmentDialog
-                    open={isAdjustmentDialogOpen}
-                    onClose={handleCloseAdjustmentDialog}
-                    item={selectedItem}
-                />
+            {loading ? (
+                <CircularProgress />
+            ) : (
+                <TableContainer component={Paper}>
+                    <Table>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell>ID</TableCell>
+                                <TableCell>Nombre</TableCell>
+                                <TableCell>Fábrica</TableCell>
+                                <TableCell>Acciones</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {almacenes.map((almacen) => (
+                                <TableRow key={almacen.id}>
+                                    <TableCell>{almacen.id}</TableCell>
+                                    <TableCell>{almacen.name}</TableCell>
+                                    <TableCell>{almacen.factory_name || almacen.factory || '-'}</TableCell>
+                                    <TableCell>
+                                        <IconButton onClick={() => handleOpenForm(almacen)} title="Editar Almacén">
+                                            <EditIcon />
+                                        </IconButton>
+                                        <IconButton onClick={() => handleDelete(almacen.id)} title="Eliminar Almacén">
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
             )}
 
-            {isEditCostDialogOpen && (
-                <EditCostDialog
-                    open={isEditCostDialogOpen}
-                    onClose={handleCloseEditCostDialog}
-                    onSave={handleSaveCost}
-                    item={selectedItem}
-                />
-            )}
-
-            {isMoveDialogOpen && (
-                <MoveStockDialog
-                    open={isMoveDialogOpen}
-                    onClose={handleCloseMoveDialog}
-                    onSave={handleSaveTransfer}
-                    item={selectedItem}
-                    locales={locales}
+            {isFormOpen && (
+                <AlmacenForm 
+                    open={isFormOpen}
+                    onClose={handleCloseForm}
+                    onSave={handleSave}
+                    almacen={selectedAlmacen}
                 />
             )}
         </Box>
     );
 };
 
-export default InventarioModule;
+export default AlmacenesManagement;
