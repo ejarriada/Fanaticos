@@ -3,9 +3,11 @@ import { Button, TextField, Grid, Select, MenuItem, InputLabel, FormControl, Cir
 import DeleteIcon from '@mui/icons-material/Delete';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 
 const PointOfSale = () => {
     const { tenantId } = useAuth();
+    const location = useLocation();
     const [products, setProducts] = useState([]);
     const [clients, setClients] = useState([]);
     const [quotations, setQuotations] = useState([]);
@@ -52,6 +54,31 @@ const PointOfSale = () => {
                     initialSaleState.caja_id = singleCaja.id;
                     setNewSale(prev => ({ ...prev, caja_id: singleCaja.id }));
                 }
+
+                // Auto-cargar cotización si viene desde el listado
+                if (location.state?.quotationId && location.state?.autoLoad) {
+                    const quotationId = location.state.quotationId;
+                    setSelectedQuotationId(quotationId);
+                    
+                    const selectedQuot = await api.get('/quotations/', quotationId);
+                    
+                    const saleItemsFromQuotation = selectedQuot.items.map(item => ({
+                        product_id: item.product,
+                        name: item.product_name,
+                        quantity: item.quantity,
+                        price: parseFloat(item.unit_price),
+                    }));
+
+                    setNewSale({
+                        ...initialSaleState,
+                        client: selectedQuot.client.id,
+                        saleItems: saleItemsFromQuotation,
+                        caja_id: singleCaja?.id || '',
+                    });
+
+                    // Limpiar el state para que no se recargue al refrescar la página
+                    window.history.replaceState({}, document.title);
+                }
             } catch (err) {
                 setError('Error al cargar los datos. Por favor, intente de nuevo.');
                 console.error(err);
@@ -63,7 +90,7 @@ const PointOfSale = () => {
         if (tenantId) {
             fetchInitialData();
         }
-    }, [tenantId]);
+    }, [tenantId, location.state]);
 
     useEffect(() => {
         const total = newSale.saleItems.reduce((acc, item) => acc + item.price * item.quantity, 0);

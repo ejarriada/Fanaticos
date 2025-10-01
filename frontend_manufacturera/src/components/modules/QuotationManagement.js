@@ -10,6 +10,7 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import QuotationForm from './QuotationForm';
+import { useNavigate } from 'react-router-dom';
 
 // Main Quotation Management Component
 const QuotationManagement = () => {
@@ -18,6 +19,18 @@ const QuotationManagement = () => {
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
     const { tenantId } = useAuth();
+
+    const navigate = useNavigate();
+
+    const handleGoToSale = (quotation) => {
+        navigate('/ventas', { 
+            state: { 
+                quotationId: quotation.id,
+                autoLoad: true 
+            } 
+        });
+    };
+
     const [currentTab, setCurrentTab] = useState(0);
     const [selectedQuotation, setSelectedQuotation] = useState(null);
     const [formKey, setFormKey] = useState(0);
@@ -144,7 +157,7 @@ const QuotationManagement = () => {
                                                     <IconButton onClick={() => handleOpenForm(quotation)} title="Editar"><EditIcon /></IconButton>
                                                     <IconButton onClick={() => handleDelete(quotation.id)} title="Eliminar"><DeleteIcon /></IconButton>
                                                     <IconButton onClick={() => alert('Imprimiendo...')} title="Imprimir"><PrintIcon /></IconButton>
-                                                    <IconButton onClick={() => alert('Yendo a venta...')} title="Ir a Venta"><ShoppingCartIcon /></IconButton>
+                                                    <IconButton onClick={() => handleGoToSale(quotation)} title="Ir a Venta" color="success"><ShoppingCartIcon /></IconButton>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
