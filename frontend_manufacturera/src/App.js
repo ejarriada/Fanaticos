@@ -70,7 +70,7 @@ function MainApp() {
             flexGrow: 1,
             px: 3,
             pb: 3,
-            pt: '52px', // CAMBIO: 48px navbar + 4px mínimo
+            pt: '60px', // CAMBIO: 48px navbar + 4px mínimo
             width: '100%',
             transition: (theme) =>
                 theme.transitions.create(['margin'], {

@@ -8,13 +8,13 @@
 
 /* Reducir altura de la barra superior */
 .MuiAppBar-root {
-  min-height: 48px !important;
-  height: 48px !important;
+  min-height: 56px !important;
+  height: 56px !important;
 }
 
 .MuiToolbar-root {
-  min-height: 48px !important;
-  height: 48px !important;
+  min-height: 56px !important;
+  height: 56px !important;
 }
 
 /* Espaciado consistente para todos los Box/Paper */

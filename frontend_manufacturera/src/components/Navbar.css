@@ -1,0 +1,46 @@
+/* Forzar altura exacta del AppBar y Toolbar */
+.MuiAppBar-root {
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+}
+
+.MuiAppBar-root .MuiToolbar-root {
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* Forzar que todos los hijos directos del Toolbar estén centrados verticalmente */
+.MuiAppBar-root .MuiToolbar-root > * {
+    align-self: center !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+/* Ajustar iconos y botones */
+.MuiAppBar-root .MuiIconButton-root {
+    padding: 8px !important;
+}
+
+.MuiAppBar-root .MuiButton-root {
+    padding: 6px 16px !important;
+}
+
+/* Avatar y Box del usuario */
+.MuiAppBar-root .MuiAvatar-root {
+    width: 32px !important;
+    height: 32px !important;
+}
+
+.MuiAppBar-root .MuiBox-root {
+    display: flex !important;
+    align-items: center !important;
+}
+
+/* Typography sin line-height extra */
+.MuiAppBar-root .MuiTypography-root {
+    line-height: 1.2 !important;
+}

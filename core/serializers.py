@@ -582,14 +582,14 @@ class MateriaPrimaProveedorSerializer(TenantAwareSerializer):
     category = serializers.CharField(source='raw_material.category', read_only=True)
     unit_of_measure = serializers.CharField(source='raw_material.unit_of_measure', read_only=True)
     supplier_name = serializers.CharField(source='supplier.name', read_only=True)
-    local_name = serializers.CharField(source='local.name', read_only=True)
+    warehouse_name = serializers.CharField(source='warehouse.name', read_only=True)
 
     class Meta(TenantAwareSerializer.Meta):
         model = MateriaPrimaProveedor
         fields = [
             'id', 'raw_material', 'supplier', 'brand', 'warehouse', 'supplier_code', 
             'cost', 'current_stock', 'batch_number', 'qr_code_data',
-            'name', 'description', 'category', 'unit_of_measure', 'supplier_name', 'local_name'
+            'name', 'description', 'category', 'unit_of_measure', 'supplier_name', 'warehouse_name'
         ]
         read_only_fields = ('batch_number', 'qr_code_data')
 

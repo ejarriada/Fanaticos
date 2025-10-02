@@ -23,6 +23,9 @@ const RawMaterialForm = ({ open, onClose, onSave, rawMaterial, onNewBrand, onBra
     const [brandsList, setBrandsList] = useState([]);
     const [loadingBrands, setLoadingBrands] = useState(true);
     const [brandsError, setBrandsError] = useState(null);
+    const [warehouses, setWarehouses] = useState([]);
+    const [loadingWarehouses, setLoadingWarehouses] = useState(true);
+    const [warehousesError, setWarehousesError] = useState(null);
     const { tenantId } = useAuth();
 
     const fetchBrands = async () => {
@@ -36,6 +39,20 @@ const RawMaterialForm = ({ open, onClose, onSave, rawMaterial, onNewBrand, onBra
             console.error(err);
         } finally {
             setLoadingBrands(false);
+        }
+    };
+
+    const fetchWarehouses = async () => {
+        try {
+            setLoadingWarehouses(true);
+            const warehousesData = await api.list('/warehouses/');
+            setWarehouses(Array.isArray(warehousesData) ? warehousesData : warehousesData.results || []);
+            setWarehousesError(null);
+        } catch (err) {
+            setWarehousesError('Error al cargar los almacenes.');
+            console.error(err);
+        } finally {
+            setLoadingWarehouses(false);
         }
     };
 
@@ -57,6 +74,7 @@ const RawMaterialForm = ({ open, onClose, onSave, rawMaterial, onNewBrand, onBra
         if (tenantId && open) {
             fetchSuppliers();
             fetchBrands();
+            fetchWarehouses();
         }
     }, [tenantId, open]);
     
@@ -76,6 +94,7 @@ const RawMaterialForm = ({ open, onClose, onSave, rawMaterial, onNewBrand, onBra
                 category: rawMaterial.category,
                 unit_of_measure: rawMaterial.unit_of_measure,
                 brand: rawMaterial.brand || '',
+                warehouse: rawMaterial.warehouse || '',
             });
         } else {
             setFormData({
@@ -88,6 +107,7 @@ const RawMaterialForm = ({ open, onClose, onSave, rawMaterial, onNewBrand, onBra
                 cost: 0,
                 brand: '',
                 current_stock: '',
+                warehouse: '',
             });
         }
     }, [rawMaterial, open]);
@@ -167,6 +187,22 @@ const RawMaterialForm = ({ open, onClose, onSave, rawMaterial, onNewBrand, onBra
                     </IconButton>
                 </Box>
                 <TextField margin="dense" name="cost" label="Costo" type="number" fullWidth value={formData.cost} onChange={handleChange} />
+                <FormControl fullWidth margin="dense">
+                    <InputLabel>Almacén</InputLabel>
+                    <Select
+                        name="warehouse"
+                        value={formData.warehouse || ''}
+                        onChange={handleChange}
+                        label="Almacén"
+                    >
+                        <MenuItem value=""><em>Ninguno</em></MenuItem>
+                        {warehouses.map((w) => (
+                            <MenuItem key={w.id} value={w.id}>
+                                {w.name}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
                 <TextField margin="dense" name="current_stock" label="Stock Actual" type="number" fullWidth value={formData.current_stock || ''} onChange={handleChange} />
             </DialogContent>
             <DialogActions>
@@ -251,6 +287,7 @@ const RawMaterialList = () => {
                     cost: formData.cost,
                     current_stock: formData.current_stock,
                     brand: formData.brand,
+                    warehouse: formData.warehouse,
                     raw_material: selectedRawMaterial.raw_material, 
                 };
                 await api.update('/materia-prima-proveedores/', selectedRawMaterial.id, materiaPrimaProveedorUpdateData);
@@ -270,6 +307,7 @@ const RawMaterialList = () => {
                     cost: formData.cost,
                     current_stock: formData.current_stock,
                     brand: formData.brand,
+                    warehouse: formData.warehouse,
                 };
                 await api.create('/materia-prima-proveedores/', materiaPrimaProveedorData);
             }
@@ -326,6 +364,7 @@ const RawMaterialList = () => {
                                 <TableCell>Nombre</TableCell>
                                 <TableCell>Número de Lote</TableCell>
                                 <TableCell>Proveedor</TableCell>
+                                <TableCell>Almacén</TableCell>
                                 <TableCell>Costo</TableCell>
                                 <TableCell>Categoría</TableCell>
                                 <TableCell>Stock Actual</TableCell>
@@ -339,6 +378,7 @@ const RawMaterialList = () => {
                                     <TableCell>{rm.name}</TableCell>
                                     <TableCell>{rm.batch_number}</TableCell>
                                     <TableCell>{rm.supplier_name || 'N/A'}</TableCell>
+                                    <TableCell>{rm.warehouse_name || 'Sin asignar'}</TableCell>
                                     <TableCell>{rm.cost}</TableCell>
                                     <TableCell>{rm.category}</TableCell>
                                     <TableCell>{rm.current_stock}</TableCell>
