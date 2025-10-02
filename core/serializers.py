@@ -8,13 +8,13 @@ from django.db.models import Max, Sum, F
 from .models import (
     Product, Tenant, User, SystemRole, Process, OrderNote, ProductionOrder, ProductionOrderItem, ProductionOrderFile, 
     RawMaterial, Brand, MateriaPrimaProveedor, PedidoMaterial, 
-    CuttingOrder, ProductionProcessLog, Local, Sale, Inventory, 
+    ProductionProcessLog, Local, Sale, Inventory, 
     Supplier, PurchaseOrder, PurchaseOrderItem, Account, CashRegister, Transaction, 
     Client, Invoice, Payment, BankStatement, BankTransaction, Bank, Check, 
     PaymentMethodType, FinancialCostRule, Factory, EmployeeRole, Employee, 
     Salary, Vacation, Permit, MedicalRecord, Quotation, QuotationItem, StockAdjustment,
     Design, DesignMaterial, DesignProcess, SaleItem, DeliveryNote, DeliveryNoteItem, DesignFile, ProductFile,
-    Category, Size, Color, DesignSize, Contact
+    Category, Size, Color, DesignSize, Contact, Warehouse
 )
 
 # --- Base and Helper Serializers ---
@@ -296,6 +296,14 @@ class SaleSerializer(TenantAwareSerializer):
 
 # --- Other Model Serializers ---
 
+class WarehouseSerializer(serializers.ModelSerializer):
+    factory_name = serializers.CharField(source='factory.name', read_only=True)
+    
+    class Meta:
+        model = Warehouse
+        fields = ['id', 'name', 'factory', 'factory_name', 'tenant']
+        read_only_fields = ['tenant']
+
 class ProductSerializer(TenantAwareSerializer):
     cost = serializers.SerializerMethodField()
     design = DesignSerializer(read_only=True)
@@ -526,11 +534,6 @@ class ProductionOrderSerializer(TenantAwareSerializer):
                     file_type='template'
                 )
         return instance
-
-class CuttingOrderSerializer(TenantAwareSerializer):
-    class Meta(TenantAwareSerializer.Meta):
-        model = CuttingOrder
-        fields = '__all__'
 
 class ProductionProcessLogSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):

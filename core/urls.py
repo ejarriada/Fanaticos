@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     TenantViewSet, ProductViewSet, UserViewSet, SystemRoleViewSet, ProcessViewSet,
-    OrderNoteViewSet, ProductionOrderViewSet, RawMaterialViewSet, BrandViewSet, MateriaPrimaProveedorViewSet, PedidoMaterialViewSet, CuttingOrderViewSet,
+    OrderNoteViewSet, ProductionOrderViewSet, RawMaterialViewSet, BrandViewSet, MateriaPrimaProveedorViewSet, PedidoMaterialViewSet,
     ProductionProcessLogViewSet, LocalViewSet, SaleViewSet, InventoryViewSet,
     SupplierViewSet, PurchaseOrderViewSet, PurchaseOrderItemViewSet, AccountViewSet,
     CashRegisterViewSet, TransactionViewSet, ClientViewSet, InvoiceViewSet, PaymentViewSet,
@@ -14,7 +14,7 @@ from .views import (
     ProductionVolumeView, ProcessCompletionRateView,
     RawMaterialConsumptionView, DefectiveProductsRateView, SalesVolumeView, InventoryTurnoverRateView,
     SupplierPerformanceView, OverallProfitLossView, CurrentBalanceView, RevenueExpensesView,
-    ProjectedGrowthView
+    ProjectedGrowthView, WarehouseViewSet
 )
 
 router = DefaultRouter()
@@ -29,7 +29,6 @@ router.register(r'raw-materials', RawMaterialViewSet)
 router.register(r'brands', BrandViewSet)
 router.register(r'materia-prima-proveedores', MateriaPrimaProveedorViewSet)
 router.register(r'pedidos-materiales', PedidoMaterialViewSet)
-router.register(r'cutting-orders', CuttingOrderViewSet)
 router.register(r'production-process-logs', ProductionProcessLogViewSet)
 router.register(r'plantillas', DesignViewSet, basename='plantilla')
 router.register(r'locals', LocalViewSet)
@@ -67,6 +66,7 @@ router.register(r'colors', ColorViewSet) # NEW
 router.register(r'design-files', DesignFileViewSet)
 router.register(r'product-files', ProductFileViewSet)
 router.register(r'contacts', ContactViewSet)
+router.register(r'warehouses', WarehouseViewSet, basename='warehouse')
 
 urlpatterns = [
     path('', include(router.urls)),

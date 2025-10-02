@@ -466,6 +466,20 @@ class PurchaseOrderItem(TenantAwareModel):
     def __str__(self):
         return f"{self.product.name} ({self.quantity}) para OC #{self.purchase_order.id}"
 
+class Warehouse(models.Model):
+    name = models.CharField(max_length=200)
+    factory = models.ForeignKey('Factory', on_delete=models.CASCADE, related_name='warehouses')
+    tenant = models.ForeignKey('Tenant', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.name} - {self.factory.name}"
+    
+    class Meta:
+        db_table = 'warehouses'
+        ordering = ['name']
+
 # --- Location and Financial Models ---
 
 class Local(TenantAwareModel):

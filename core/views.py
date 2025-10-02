@@ -17,7 +17,7 @@ from django.db.models import Sum, Count, F, Avg, Case, When
 from .models import (
     Product, Tenant, User, SystemRole, Process, OrderNote, ProductionOrder, 
     RawMaterial, Brand, MateriaPrimaProveedor, PedidoMaterial, # Refactored Raw Material Models
-    CuttingOrder, ProductionProcessLog, Local, Sale, Inventory, 
+    ProductionProcessLog, Local, Sale, Inventory, 
     Supplier, PurchaseOrder, PurchaseOrderItem, Account, CashRegister, Transaction, 
     Client, Invoice, Payment, BankStatement, BankTransaction, Bank, 
     PaymentMethodType, FinancialCostRule, Factory, EmployeeRole, Employee, 
@@ -32,7 +32,6 @@ from .serializers import (
     SystemRoleSerializer, ProcessSerializer, OrderNoteSerializer, 
     ProductionOrderSerializer, 
     RawMaterialSerializer, BrandSerializer, MateriaPrimaProveedorSerializer, PedidoMaterialSerializer, # Refactored Raw Material Serializers
-    CuttingOrderSerializer, 
     ProductionProcessLogSerializer, LocalSerializer, SaleSerializer, 
     InventorySerializer, SupplierSerializer, PurchaseOrderSerializer, 
     PurchaseOrderItemSerializer, AccountSerializer, CashRegisterSerializer, 
@@ -43,7 +42,7 @@ from .serializers import (
     PermitSerializer, MedicalRecordSerializer, StockAdjustmentSerializer, QuotationSerializer, QuotationItemSerializer,
     DesignSerializer, SaleItemSerializer, DeliveryNoteSerializer, DeliveryNoteItemSerializer, 
     DesignMaterialSerializer, DesignProcessSerializer, DesignFileSerializer, ProductFileSerializer, ContactSerializer,
-    CategorySerializer, SizeSerializer, ColorSerializer, CheckSerializer, TenantTokenObtainPairSerializer, # NEW IMPORTS
+    CategorySerializer, SizeSerializer, ColorSerializer, CheckSerializer, TenantTokenObtainPairSerializer, WarehouseSerializer
 )
 
 # Base ViewSet for Tenant-Aware Models
@@ -251,7 +250,6 @@ class MateriaPrimaProveedorViewSet(TenantAwareViewSet):
         return Response({'qr_code_data': qr_code_base64}, status=status.HTTP_200_OK)
 
 
-class CuttingOrderViewSet(TenantAwareViewSet): queryset = CuttingOrder.objects.all(); serializer_class = CuttingOrderSerializer
 class ProductionProcessLogViewSet(TenantAwareViewSet): queryset = ProductionProcessLog.objects.all(); serializer_class = ProductionProcessLogSerializer
 class DesignViewSet(TenantAwareViewSet):
     queryset = Design.objects.all()
@@ -359,6 +357,16 @@ class InventoryViewSet(TenantAwareViewSet):
             destination_inventory.save()
 
         return Response({'message': 'Stock transferred successfully.'}, status=status.HTTP_200_OK)
+
+class WarehouseViewSet(viewsets.ModelViewSet):
+    serializer_class = WarehouseSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        return Warehouse.objects.filter(tenant=self.request.user.tenant)
+    
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.request.user.tenant)
 
 class SupplierViewSet(TenantAwareViewSet):
     queryset = Supplier.objects.all()
