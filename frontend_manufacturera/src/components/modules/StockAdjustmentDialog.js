@@ -4,7 +4,7 @@ import {
     TextField, MenuItem, Typography, Box 
 } from '@mui/material';
 
-const StockAdjustmentDialog = ({ open, onClose, onSave, item }) => {
+const StockAdjustmentDialog = ({ open, onClose, onSave, item, locales }) => {
     const [formData, setFormData] = useState({});
 
     const ADJUSTMENT_TYPE_CHOICES = [
@@ -19,10 +19,11 @@ const StockAdjustmentDialog = ({ open, onClose, onSave, item }) => {
             setFormData({
                 quantity: '',
                 adjustment_type: 'Correccion',
-                notes: ''
+                notes: '',
+                local: item.local?.id || item.local || '' // Pre-select local if it exists on the item
             });
         } else {
-            setFormData({});
+            setFormData({}); // Should not happen if dialog opens only for an item
         }
     }, [item, open]);
 
@@ -36,10 +37,18 @@ const StockAdjustmentDialog = ({ open, onClose, onSave, item }) => {
             quantity: parseInt(formData.quantity, 10) || 0,
         };
 
-        if (item.batch_number) { // Heuristic to check if it's a RawMaterial
-            dataToSave.raw_material = item.id;
-        } else { // Assumes it's a Product
-            dataToSave.product = item.id;
+        // The backend needs to know which item to adjust.
+        // We distinguish by checking for a property unique to raw materials vs finished products.
+        if (item.supplier_name) { // Heuristic for MateriaPrimaProveedor
+            dataToSave.raw_material_supplier_id = item.id;
+        } else { // Assumes it's an Inventory item
+            dataToSave.inventory_id = item.id;
+        }
+
+        // If it's a new stock load, we must provide the local.
+        if (formData.adjustment_type === 'Inicial' && !formData.local) {
+            alert('Debe seleccionar un almacén para la carga inicial de stock.');
+            return;
         }
 
         onSave(dataToSave);
@@ -51,10 +60,12 @@ const StockAdjustmentDialog = ({ open, onClose, onSave, item }) => {
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
             <DialogTitle>Ajuste de Stock</DialogTitle>
             <DialogContent>
-                <Box sx={{ mt: 2 }}>
-                    <Typography variant="h6">{item.name}</Typography>
+                <Box sx={{ mt: 2, mb: 2 }}>
+                    <Typography variant="h6">{item.product?.name || item.name}</Typography>
                     <Typography variant="body1">
-                        Stock Actual: {item.stock !== undefined ? item.stock : item.current_stock}
+                        Stock Actual: {item.quantity !== undefined ? item.quantity : item.current_stock}
+                        {item.local?.name && ` en ${item.local.name}`}
+                        {item.local_name && ` en ${item.local_name}`}
                     </Typography>
                 </Box>
                 <TextField
@@ -69,6 +80,23 @@ const StockAdjustmentDialog = ({ open, onClose, onSave, item }) => {
                     {ADJUSTMENT_TYPE_CHOICES.map((option) => (
                         <MenuItem key={option.value} value={option.value}>
                             {option.label}
+                        </MenuItem>
+                    ))}
+                </TextField>
+                <TextField
+                    margin="dense"
+                    name="local"
+                    label="Almacén"
+                    select
+                    fullWidth
+                    value={formData.local || ''}
+                    onChange={handleChange}
+                    disabled={!!(item.local || item.local_name)} // Disable if the item already has a location
+                    helperText={item.local || item.local_name ? "No se puede cambiar el almacén de un stock existente." : "Seleccione un almacén."}
+                >
+                    {(locales || []).map((local) => (
+                        <MenuItem key={local.id} value={local.id}>
+                            {local.name}
                         </MenuItem>
                     ))}
                 </TextField>

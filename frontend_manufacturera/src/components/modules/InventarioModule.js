@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Tab, Tabs, Typography } from '@mui/material';
+import { Box, Tab, Tabs, Typography, Alert } from '@mui/material';
 import * as api from '../../utils/api';
 
 import MateriaPrimaStock from './MateriaPrimaStock';
@@ -8,6 +8,8 @@ import AlmacenesManagement from './AlmacenesManagement';
 import StockAdjustmentDialog from './StockAdjustmentDialog';
 import EditCostDialog from './EditCostDialog';
 import MoveStockDialog from './MoveStockDialog';
+
+import { useAuth } from '../../context/AuthContext';
 
 function TabPanel(props) {
     const { children, value, index, ...other } = props;
@@ -35,21 +37,24 @@ const InventarioModule = () => {
     const [isEditCostDialogOpen, setIsEditCostDialogOpen] = useState(false);
     const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
-    const [warehouses, setWarehouses] = useState([]);
+    const [locales, setLocales] = useState([]); // Standardized to locales
     const [refreshKey, setRefreshKey] = useState(0);
     const [error, setError] = useState(null);
+    const { tenantId } = useAuth(); // Get tenantId from context
 
     useEffect(() => {
-        const fetchWarehouses = async () => {
+        const fetchLocales = async () => {
+            if (!tenantId) return; // Don't fetch if tenantId is not available
             try {
-                const data = await api.list('/warehouses/');
-                setWarehouses(data.results || (Array.isArray(data) ? data : []));
+                const data = await api.list('/locals/'); // Corrected endpoint
+                setLocales(data.results || (Array.isArray(data) ? data : []));
             } catch (err) {
-                console.error("Failed to fetch warehouses", err);
+                console.error("Failed to fetch locales", err);
+                setError('No se pudieron cargar los almacenes.');
             }
         };
-        fetchWarehouses();
-    }, []);
+        fetchLocales();
+    }, [tenantId]); // Add tenantId to dependency array
 
     const handleChange = (event, newValue) => {
         setValue(newValue);
@@ -63,7 +68,17 @@ const InventarioModule = () => {
     const handleCloseAdjustmentDialog = () => {
         setIsAdjustmentDialogOpen(false);
         setSelectedItem(null);
-        setRefreshKey(prev => prev + 1);
+    };
+
+    const handleSaveAdjustment = async (adjustmentData) => {
+        try {
+            await api.create('/stock-adjustments/', adjustmentData);
+            setRefreshKey(prev => prev + 1); // Refresh stock tables
+            handleCloseAdjustmentDialog();
+        } catch (err) {
+            setError(`Error al guardar el ajuste: ${err.response?.data?.error || err.message}`);
+            console.error(err);
+        }
     };
 
     const handleOpenEditCost = (item) => {
@@ -126,6 +141,7 @@ const InventarioModule = () => {
     return (
         <Box sx={{ width: '100%' }}>
             <Typography variant="h4" sx={{ mb: 3 }}>Gestión de Inventario</Typography>
+            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                 <Tabs value={value} onChange={handleChange} aria-label="pestañas de inventario">
                     <Tab label="Stock Materia Prima" id="inventario-tab-0" />
@@ -157,7 +173,9 @@ const InventarioModule = () => {
                 <StockAdjustmentDialog
                     open={isAdjustmentDialogOpen}
                     onClose={handleCloseAdjustmentDialog}
+                    onSave={handleSaveAdjustment}
                     item={selectedItem}
+                    locales={locales}
                 />
             )}
 
@@ -176,7 +194,7 @@ const InventarioModule = () => {
                     onClose={handleCloseMoveDialog}
                     onSave={handleSaveTransfer}
                     item={selectedItem}
-                    locales={warehouses}
+                    locales={locales}
                 />
             )}
         </Box>

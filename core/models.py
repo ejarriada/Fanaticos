@@ -48,6 +48,7 @@ class RawMaterial(TenantAwareModel):
 class MateriaPrimaProveedor(TenantAwareModel):
     raw_material = models.ForeignKey(RawMaterial, on_delete=models.CASCADE, related_name="proveedores")
     supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE, related_name="materias_primas")
+    local = models.ForeignKey('Local', on_delete=models.SET_NULL, null=True, blank=True, help_text="Almacén donde se encuentra este stock de materia prima")
     supplier_code = models.CharField(max_length=100, blank=True, null=True)
     brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True)
     cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
@@ -56,10 +57,10 @@ class MateriaPrimaProveedor(TenantAwareModel):
     qr_code_data = models.TextField(blank=True, null=True) # Field for storing QR code image data
 
     class Meta:
-        unique_together = ('raw_material', 'supplier', 'tenant')
+        unique_together = ('raw_material', 'supplier', 'local', 'tenant')
 
     def __str__(self):
-        return f"{self.raw_material.name} - {self.supplier.name}"
+        return f"{self.raw_material.name} - {self.supplier.name} ({self.local.name if self.local else 'Sin Ubicación'})"
 
 class Process(TenantAwareModel):
     name = models.CharField(max_length=100, unique=True)

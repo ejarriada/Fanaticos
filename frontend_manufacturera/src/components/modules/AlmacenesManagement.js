@@ -3,7 +3,7 @@ import {
     Box, Typography, Paper, Table, TableBody, 
     TableCell, TableContainer, TableHead, TableRow, CircularProgress, 
     Alert, Button, IconButton, Dialog, DialogTitle, DialogContent, 
-    DialogActions, TextField
+    DialogActions, TextField, FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -195,8 +195,7 @@ const AlmacenesManagement = () => {
                             <TableRow>
                                 <TableCell>ID</TableCell>
                                 <TableCell>Nombre</TableCell>
-                                <TableCell>Dirección</TableCell>
-                                <TableCell>Teléfono</TableCell>
+                                <TableCell>Fábrica</TableCell>
                                 <TableCell>Acciones</TableCell>
                             </TableRow>
                         </TableHead>
@@ -205,8 +204,7 @@ const AlmacenesManagement = () => {
                                 <TableRow key={almacen.id}>
                                     <TableCell>{almacen.id}</TableCell>
                                     <TableCell>{almacen.name}</TableCell>
-                                    <TableCell>{almacen.address || '-'}</TableCell>
-                                    <TableCell>{almacen.phone_number || '-'}</TableCell>
+                                    <TableCell>{almacen.factory_name || '-'}</TableCell>
                                     <TableCell>
                                         <IconButton onClick={() => handleOpenForm(almacen)} title="Editar Almacén">
                                             <EditIcon />

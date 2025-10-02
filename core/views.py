@@ -12,7 +12,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.views import TokenObtainPairView
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Sum, Count, F, Avg, Case, When
 from .models import (
     Product, Tenant, User, SystemRole, Process, OrderNote, ProductionOrder, 
@@ -25,7 +25,7 @@ from .models import (
     Design, DesignMaterial, DesignProcess, SaleItem, DeliveryNote, DeliveryNoteItem, DesignFile, ProductFile, Contact,
     MedicalRecord, Quotation, QuotationItem, StockAdjustment,
     Design, DesignMaterial, DesignProcess, SaleItem, DeliveryNote, DeliveryNoteItem,
-    Category, Size, Color, Check # NEW IMPORTS
+    Category, Size, Color, Check, Warehouse
 )
 from .serializers import (
     ProductSerializer, TenantSerializer, UserSerializer, UserCreateSerializer, 
@@ -42,7 +42,7 @@ from .serializers import (
     PermitSerializer, MedicalRecordSerializer, StockAdjustmentSerializer, QuotationSerializer, QuotationItemSerializer,
     DesignSerializer, SaleItemSerializer, DeliveryNoteSerializer, DeliveryNoteItemSerializer, 
     DesignMaterialSerializer, DesignProcessSerializer, DesignFileSerializer, ProductFileSerializer, ContactSerializer,
-    CategorySerializer, SizeSerializer, ColorSerializer, CheckSerializer, TenantTokenObtainPairSerializer, WarehouseSerializer
+    CategorySerializer, SizeSerializer, ColorSerializer, CheckSerializer, TenantTokenObtainPairSerializer
 )
 
 # Base ViewSet for Tenant-Aware Models
@@ -286,7 +286,49 @@ class CategoryViewSet(TenantAwareViewSet): queryset = Category.objects.all(); se
 class SizeViewSet(TenantAwareViewSet): queryset = Size.objects.all(); serializer_class = SizeSerializer         # NEW
 
 class ColorViewSet(TenantAwareViewSet): queryset = Color.objects.all(); serializer_class = ColorSerializer
-class LocalViewSet(TenantAwareViewSet): queryset = Local.objects.all(); serializer_class = LocalSerializer
+class LocalViewSet(TenantAwareViewSet):
+    queryset = Local.objects.all()
+    serializer_class = LocalSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        
+        # Check for finished product stock
+        if Inventory.objects.filter(local=instance, quantity__gt=0).exists():
+            return Response(
+                {'error': 'No se puede eliminar el almacén porque tiene stock de productos terminados.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Check for raw material stock
+        if MateriaPrimaProveedor.objects.filter(local=instance, current_stock__gt=0).exists():
+            return Response(
+                {'error': 'No se puede eliminar el almacén porque tiene stock de materias primas.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Check for associated cash registers
+        if CashRegister.objects.filter(local=instance).exists():
+            return Response(
+                {'error': 'No se puede eliminar el almacén porque tiene cajas registradoras asociadas.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Check for assigned employees
+        if Employee.objects.filter(local=instance).exists():
+            return Response(
+                {'error': 'No se puede eliminar el almacén porque tiene empleados asignados.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check for sales made from this local
+        if Sale.objects.filter(local=instance).exists():
+            return Response(
+                {'error': 'No se puede eliminar el almacén porque se han registrado ventas en él.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return super().destroy(request, *args, **kwargs)
 
 class SaleViewSet(TenantAwareViewSet):
     queryset = Sale.objects.all().order_by('-sale_date')
@@ -359,7 +401,7 @@ class InventoryViewSet(TenantAwareViewSet):
         return Response({'message': 'Stock transferred successfully.'}, status=status.HTTP_200_OK)
 
 class WarehouseViewSet(viewsets.ModelViewSet):
-    serializer_class = WarehouseSerializer
+    serializer_class = 'core.serializers.WarehouseSerializer'
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
@@ -772,7 +814,43 @@ class QuotationViewSet(TenantAwareViewSet):
 
         return Response(SaleSerializer(sale, context={'request': request}).data, status=status.HTTP_201_CREATED)
 class QuotationItemViewSet(TenantAwareViewSet): queryset = QuotationItem.objects.all(); serializer_class = QuotationItemSerializer
-class StockAdjustmentViewSet(TenantAwareViewSet): queryset = StockAdjustment.objects.all(); serializer_class = StockAdjustmentSerializer
+class StockAdjustmentViewSet(TenantAwareViewSet):
+    queryset = StockAdjustment.objects.all()
+    serializer_class = StockAdjustmentSerializer
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        quantity = serializer.validated_data.get('quantity')
+        inventory_id = request.data.get('inventory_id')
+        raw_material_supplier_id = request.data.get('raw_material_supplier_id')
+
+        if inventory_id:
+            try:
+                inventory_item = Inventory.objects.get(id=inventory_id, tenant=self.get_tenant())
+                inventory_item.quantity += quantity
+                inventory_item.save()
+                serializer.validated_data['product'] = inventory_item.product
+            except Inventory.DoesNotExist:
+                return Response({'error': 'El registro de inventario del producto no fue encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        elif raw_material_supplier_id:
+            try:
+                rmp_item = MateriaPrimaProveedor.objects.get(id=raw_material_supplier_id, tenant=self.get_tenant())
+                rmp_item.current_stock += quantity
+                rmp_item.save()
+                serializer.validated_data['raw_material'] = rmp_item.raw_material
+            except MateriaPrimaProveedor.DoesNotExist:
+                return Response({'error': 'El registro de stock de materia prima no fue encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        else:
+            return Response({'error': 'Debe especificar un item de inventario o de materia prima para ajustar.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 class DeliveryNoteViewSet(TenantAwareViewSet):
     queryset = DeliveryNote.objects.all()
     serializer_class = DeliveryNoteSerializer
