@@ -119,7 +119,7 @@ const AlmacenesManagement = () => {
     const fetchAlmacenes = async () => {
         try {
             setLoading(true);
-            const data = await api.list('/locals/');
+            const data = await api.list('/warehouses/');
             setAlmacenes(data.results || (Array.isArray(data) ? data : []));
             setError(null);
         } catch (err) {
@@ -147,9 +147,9 @@ const AlmacenesManagement = () => {
     const handleSave = async (formData) => {
         try {
             if (selectedAlmacen) {
-                await api.update('/locals/', selectedAlmacen.id, formData);
+                await api.update('/warehouses/', selectedAlmacen.id, formData);
             } else {
-                await api.create('/locals/', formData);
+                await api.create('/warehouses/', formData);
             }
             fetchAlmacenes();
             handleCloseForm();
@@ -166,7 +166,7 @@ const AlmacenesManagement = () => {
     const handleDelete = async (id) => {
         if (window.confirm('¿Está seguro de que desea eliminar este almacén? Esta acción no se puede deshacer.')) {
             try {
-                await api.remove('/locals/', id);
+                await api.remove('/warehouses/', id);
                 fetchAlmacenes();
             } catch (err) {
                 setError('Error al eliminar el almacén.');
