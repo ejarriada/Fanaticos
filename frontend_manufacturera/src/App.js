@@ -9,6 +9,8 @@ import ReportsModule from './components/reports/ReportsModule';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import { Box, CssBaseline, Toolbar, CircularProgress } from '@mui/material';
+import { ThemeProvider } from '@mui/material/styles';
+import theme from './theme';
 
 // Import all module components
 import ProcessManagement from './components/modules/ProcessManagement';
@@ -90,50 +92,52 @@ function MainApp() {
 
   return (
     <div className="App">
-      <Router>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/"
-            element={
-              <PrivateRoute>
-                <Navigate to="/ordenes-de-produccion" replace />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/manufacturing-dashboard"
-            element={
-              <PrivateRoute>
-                <ManufacturingDashboard />
-              </PrivateRoute>
-            }
-          />
-          
-          {/* Routes for manufacturing-specific modules */}
-          <Route path="/remitos" element={<PrivateRoute><RemitosModule /></PrivateRoute>} />
-          <Route path="/processes" element={<PrivateRoute><ProcessManagement /></PrivateRoute>} />
-          <Route path="/notas-de-pedido" element={<PrivateRoute><OrderNoteManagement /></PrivateRoute>} />
-          <Route path="/ordenes-de-produccion" element={<PrivateRoute><ProductionOrderManagement /></PrivateRoute>} />
-          <Route path="/materias-primas" element={<PrivateRoute><MateriasPrimasModule /></PrivateRoute>} />
-          <Route path="/seguimiento-produccion" element={<PrivateRoute><ProductionTracking /></PrivateRoute>} />
-          <Route path="/designs" element={<Navigate to="/products" replace />} />
-          <Route path="/products" element={<PrivateRoute><ProductosModule /></PrivateRoute>} />
-          <Route path="/inventory" element={<PrivateRoute><InventarioModule /></PrivateRoute>} />
+      <ThemeProvider theme={theme}>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/"
+              element={
+                <PrivateRoute>
+                  <Navigate to="/ordenes-de-produccion" replace />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/manufacturing-dashboard"
+              element={
+                <PrivateRoute>
+                  <ManufacturingDashboard />
+                </PrivateRoute>
+              }
+            />
+            
+            {/* Routes for manufacturing-specific modules */}
+            <Route path="/remitos" element={<PrivateRoute><RemitosModule /></PrivateRoute>} />
+            <Route path="/processes" element={<PrivateRoute><ProcessManagement /></PrivateRoute>} />
+            <Route path="/notas-de-pedido" element={<PrivateRoute><OrderNoteManagement /></PrivateRoute>} />
+            <Route path="/ordenes-de-produccion" element={<PrivateRoute><ProductionOrderManagement /></PrivateRoute>} />
+            <Route path="/materias-primas" element={<PrivateRoute><MateriasPrimasModule /></PrivateRoute>} />
+            <Route path="/seguimiento-produccion" element={<PrivateRoute><ProductionTracking /></PrivateRoute>} />
+            <Route path="/designs" element={<Navigate to="/products" replace />} />
+            <Route path="/products" element={<PrivateRoute><ProductosModule /></PrivateRoute>} />
+            <Route path="/inventory" element={<PrivateRoute><InventarioModule /></PrivateRoute>} />
 
-          {/* Routes for common modules (financial, HR, quotations) */}
-          <Route path="/ventas" element={<PrivateRoute><VentasModule /></PrivateRoute>} />
-          <Route path="/contable-finanzas" element={<PrivateRoute><FinanzasModule /></PrivateRoute>} />
-          <Route path="/recursos-humanos" element={<PrivateRoute><RRHHModule /></PrivateRoute>} />
-          <Route path="/presupuestos" element={<PrivateRoute><PresupuestoModule /></PrivateRoute>} />
-          <Route path="/administracion" element={<PrivateRoute><AdministrationModule /></PrivateRoute>} />
-          
-          <Route path="/clientes" element={<PrivateRoute><ClientesModule /></PrivateRoute>} />
-          <Route path="/proveedores" element={<PrivateRoute><ProveedoresModule /></PrivateRoute>} />
-          <Route path="/reports" element={<PrivateRoute><ReportsModule /></PrivateRoute>} />
-          <Route path="/test" element={<PrivateRoute><TestComponent /></PrivateRoute>} />
-        </Routes>
-      </Router>
+            {/* Routes for common modules (financial, HR, quotations) */}
+            <Route path="/ventas" element={<PrivateRoute><VentasModule /></PrivateRoute>} />
+            <Route path="/contable-finanzas" element={<PrivateRoute><FinanzasModule /></PrivateRoute>} />
+            <Route path="/recursos-humanos" element={<PrivateRoute><RRHHModule /></PrivateRoute>} />
+            <Route path="/presupuestos" element={<PrivateRoute><PresupuestoModule /></PrivateRoute>} />
+            <Route path="/administracion" element={<PrivateRoute><AdministrationModule /></PrivateRoute>} />
+            
+            <Route path="/clientes" element={<PrivateRoute><ClientesModule /></PrivateRoute>} />
+            <Route path="/proveedores" element={<PrivateRoute><ProveedoresModule /></PrivateRoute>} />
+            <Route path="/reports" element={<PrivateRoute><ReportsModule /></PrivateRoute>} />
+            <Route path="/test" element={<PrivateRoute><TestComponent /></PrivateRoute>} />
+          </Routes>
+        </Router>
+      </ThemeProvider>
     </div>
   );
 }

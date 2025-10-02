@@ -16,6 +16,36 @@ const theme = createTheme({
       default: '#fff',
     },
   },
+  components: {
+    MuiToolbar: {
+      styleOverrides: {
+        root: {
+          minHeight: '56px !important',
+          height: '56px',
+          paddingTop: '0 !important',
+          paddingBottom: '0 !important',
+          '@media (min-width: 0px)': {
+            minHeight: '56px !important',
+            paddingTop: '0 !important',
+            paddingBottom: '0 !important',
+          },
+          '@media (min-width: 600px)': {
+            minHeight: '56px !important',
+            paddingTop: '0 !important',
+            paddingBottom: '0 !important',
+          },
+        },
+      },
+    },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          height: '56px',
+          minHeight: '56px',
+        },
+      },
+    },
+  },
 });
 
 export default theme;

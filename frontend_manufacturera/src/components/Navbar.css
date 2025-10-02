@@ -1,46 +1,68 @@
-/* Forzar altura exacta del AppBar y Toolbar */
-.MuiAppBar-root {
-    height: 56px !important;
-    min-height: 56px !important;
-    max-height: 56px !important;
+.navbar-content {
+    display: flex;
+    align-items: center;
+    height: 56px;
+    padding: 0 16px;
+    gap: 16px;
+    box-sizing: border-box; /* AGREGAR */
 }
 
-.MuiAppBar-root .MuiToolbar-root {
-    height: 56px !important;
-    min-height: 56px !important;
-    max-height: 56px !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
+.navbar-menu-button {
+    padding: 4px !important;  /* Reducido de 8px */
+    height: 32px !important;  /* Reducido de 40px */
+    width: 32px !important;   /* Reducido de 40px */
+    min-height: 32px !important;
 }
 
-/* Forzar que todos los hijos directos del Toolbar estén centrados verticalmente */
-.MuiAppBar-root .MuiToolbar-root > * {
-    align-self: center !important;
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
+.navbar-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: white;
+    line-height: 1; /* AGREGAR */
+    margin: 0; /* AGREGAR */
 }
 
-/* Ajustar iconos y botones */
-.MuiAppBar-root .MuiIconButton-root {
-    padding: 8px !important;
+.navbar-spacer {
+    flex-grow: 1;
 }
 
-.MuiAppBar-root .MuiButton-root {
-    padding: 6px 16px !important;
+.navbar-user-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 4px 10px;  /* Reducido de 6px 12px */
+    height: 32px;       /* Reducido de 36px */
+    box-sizing: border-box;
 }
 
-/* Avatar y Box del usuario */
-.MuiAppBar-root .MuiAvatar-root {
-    width: 32px !important;
-    height: 32px !important;
+.navbar-user-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0; /* AGREGAR */
 }
 
-.MuiAppBar-root .MuiBox-root {
-    display: flex !important;
-    align-items: center !important;
+.navbar-user-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: white;
+    line-height: 1; /* AGREGAR */
+    white-space: nowrap; /* AGREGAR */
 }
 
-/* Typography sin line-height extra */
-.MuiAppBar-root .MuiTypography-root {
-    line-height: 1.2 !important;
+.navbar-logout-button {
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    text-transform: none !important;
+    border-radius: 8px !important;
+    padding: 4px 12px !important;  /* Reducido de 6px 16px */
+    height: 32px !important;       /* Reducido de 36px */
+    min-height: 32px !important;
+    line-height: 1 !important;
+}
+
+.navbar-logout-button:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
 }
