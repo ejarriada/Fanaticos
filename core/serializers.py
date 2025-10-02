@@ -538,11 +538,11 @@ class LocalSerializer(TenantAwareSerializer):
 
 class InventorySerializer(TenantAwareSerializer):
     product = SimpleProductSerializer(read_only=True)
-    local = LocalSerializer(read_only=True)
+    warehouse = WarehouseSerializer(read_only=True)
 
     class Meta(TenantAwareSerializer.Meta):
         model = Inventory
-        fields = ['id', 'product', 'local', 'quantity']
+        fields = ['id', 'product', 'warehouse', 'quantity']
 
 class SupplierSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):
@@ -573,8 +573,8 @@ class MateriaPrimaProveedorSerializer(TenantAwareSerializer):
     brand = serializers.PrimaryKeyRelatedField(
         queryset=Brand.objects.all(), required=False, allow_null=True
     )
-    local = serializers.PrimaryKeyRelatedField(
-        queryset=Local.objects.all(), required=False, allow_null=True
+    warehouse = serializers.PrimaryKeyRelatedField(
+        queryset=Warehouse.objects.all(), required=False, allow_null=True
     )
     
     name = serializers.CharField(source='raw_material.name', read_only=True)
@@ -587,7 +587,7 @@ class MateriaPrimaProveedorSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):
         model = MateriaPrimaProveedor
         fields = [
-            'id', 'raw_material', 'supplier', 'brand', 'local', 'supplier_code', 
+            'id', 'raw_material', 'supplier', 'brand', 'warehouse', 'supplier_code', 
             'cost', 'current_stock', 'batch_number', 'qr_code_data',
             'name', 'description', 'category', 'unit_of_measure', 'supplier_name', 'local_name'
         ]

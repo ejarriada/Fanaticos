@@ -45,10 +45,27 @@ class RawMaterial(TenantAwareModel):
     def __str__(self):
         return self.name
 
+class Warehouse(models.Model):
+    name = models.CharField(max_length=200)
+    factory = models.ForeignKey('Factory', on_delete=models.CASCADE, related_name='warehouses')
+    tenant = models.ForeignKey('Tenant', on_delete=models.CASCADE)
+    is_default_for_finished_products = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.name} - {self.factory.name}"
+    
+    class Meta:
+        db_table = 'warehouses'
+        ordering = ['name']
+
+# --- Location and Financial Models ---
+
 class MateriaPrimaProveedor(TenantAwareModel):
     raw_material = models.ForeignKey(RawMaterial, on_delete=models.CASCADE, related_name="proveedores")
     supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE, related_name="materias_primas")
-    local = models.ForeignKey('Local', on_delete=models.SET_NULL, null=True, blank=True, help_text="Almacén donde se encuentra este stock de materia prima")
+    warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, related_name='raw_materials', null=True, blank=True)
     supplier_code = models.CharField(max_length=100, blank=True, null=True)
     brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True)
     cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
@@ -57,7 +74,7 @@ class MateriaPrimaProveedor(TenantAwareModel):
     qr_code_data = models.TextField(blank=True, null=True) # Field for storing QR code image data
 
     class Meta:
-        unique_together = ('raw_material', 'supplier', 'local', 'tenant')
+        unique_together = ('raw_material', 'supplier', 'warehouse', 'tenant')
 
     def __str__(self):
         return f"{self.raw_material.name} - {self.supplier.name} ({self.local.name if self.local else 'Sin Ubicación'})"
@@ -467,22 +484,6 @@ class PurchaseOrderItem(TenantAwareModel):
     def __str__(self):
         return f"{self.product.name} ({self.quantity}) para OC #{self.purchase_order.id}"
 
-class Warehouse(models.Model):
-    name = models.CharField(max_length=200)
-    factory = models.ForeignKey('Factory', on_delete=models.CASCADE, related_name='warehouses')
-    tenant = models.ForeignKey('Tenant', on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"{self.name} - {self.factory.name}"
-    
-    class Meta:
-        db_table = 'warehouses'
-        ordering = ['name']
-
-# --- Location and Financial Models ---
-
 class Local(TenantAwareModel):
     name = models.CharField(max_length=100, unique=True)
     address = models.CharField(max_length=255, blank=True, null=True)
@@ -493,12 +494,12 @@ class Local(TenantAwareModel):
 
 class Inventory(TenantAwareModel):
     product = models.ForeignKey(Product, on_delete=models.CASCADE) # Uncommented
-    local = models.ForeignKey(Local, on_delete=models.CASCADE)
+    warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, related_name='finished_products', null=True, blank=True)
     quantity = models.IntegerField()
 
     class Meta:
-        unique_together = ('product', 'local', 'tenant')
-
+        unique_together = ('product', 'warehouse', 'tenant')
+ 
     def __str__(self):
         return f"{self.product.name} en {self.local.name}: {self.quantity}"
 

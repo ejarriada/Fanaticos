@@ -42,7 +42,7 @@ from .serializers import (
     PermitSerializer, MedicalRecordSerializer, StockAdjustmentSerializer, QuotationSerializer, QuotationItemSerializer,
     DesignSerializer, SaleItemSerializer, DeliveryNoteSerializer, DeliveryNoteItemSerializer, 
     DesignMaterialSerializer, DesignProcessSerializer, DesignFileSerializer, ProductFileSerializer, ContactSerializer,
-    CategorySerializer, SizeSerializer, ColorSerializer, CheckSerializer, TenantTokenObtainPairSerializer
+    CategorySerializer, SizeSerializer, ColorSerializer, CheckSerializer, TenantTokenObtainPairSerializer, WarehouseSerializer
 )
 
 # Base ViewSet for Tenant-Aware Models
@@ -400,15 +400,9 @@ class InventoryViewSet(TenantAwareViewSet):
 
         return Response({'message': 'Stock transferred successfully.'}, status=status.HTTP_200_OK)
 
-class WarehouseViewSet(viewsets.ModelViewSet):
-    serializer_class = 'core.serializers.WarehouseSerializer'
-    permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
-        return Warehouse.objects.filter(tenant=self.request.user.tenant)
-    
-    def perform_create(self, serializer):
-        serializer.save(tenant=self.request.user.tenant)
+class WarehouseViewSet(TenantAwareViewSet):
+    queryset = Warehouse.objects.all()
+    serializer_class = WarehouseSerializer
 
 class SupplierViewSet(TenantAwareViewSet):
     queryset = Supplier.objects.all()

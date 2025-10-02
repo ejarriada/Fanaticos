@@ -43,40 +43,41 @@ const MateriaPrimaStock = ({ onAdjustStock, onDelete, onEdit, refreshKey }) => {
             <Typography variant="h5" gutterBottom>Stock de Materia Prima por Proveedor</Typography>
             <TableContainer component={Paper}>
                 <Table>
-                                            <TableHead>
-                                                <TableRow>
-                                                    <TableCell>Materia Prima</TableCell>
-                                                    <TableCell>Proveedor</TableCell>
-                                                    <TableCell>Almacén</TableCell>
-                                                    <TableCell>Costo</TableCell>
-                                                    <TableCell>Stock Actual</TableCell>
-                                                    <TableCell>Unidad</TableCell>
-                                                    <TableCell>Acciones</TableCell>
-                                                </TableRow>
-                                            </TableHead>
-                                            <TableBody>
-                                                {stockItems.map((item) => (
-                                                    <TableRow key={item.id}>
-                                                        <TableCell>{item.name}</TableCell>
-                                                        <TableCell>{item.supplier_name}</TableCell>
-                                                        <TableCell>{item.local_name || 'N/A'}</TableCell>
-                                                        <TableCell>${parseFloat(item.cost).toFixed(2)}</TableCell>
-                                                        <TableCell>{item.current_stock}</TableCell>
-                                                        <TableCell>{item.unit_of_measure}</TableCell>
-                                                        <TableCell>
-                                                            <IconButton onClick={() => onAdjustStock(item)} title="Ajustar Stock">
-                                                                <TuneIcon />
-                                                            </IconButton>
-                                                            <IconButton onClick={() => onEdit(item)} title="Editar Costo">
-                                                                <EditIcon />
-                                                            </IconButton>
-                                                            <IconButton onClick={() => onDelete(item.id, 'raw')} title="Eliminar Stock">
-                                                                <DeleteIcon />
-                                                            </IconButton>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>                </Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>Materia Prima</TableCell>
+                            <TableCell>Proveedor</TableCell>
+                            <TableCell>Almacén</TableCell>
+                            <TableCell>Costo</TableCell>
+                            <TableCell>Stock Actual</TableCell>
+                            <TableCell>Unidad</TableCell>
+                            <TableCell>Acciones</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {stockItems.map((item) => (
+                            <TableRow key={item.id}>
+                                <TableCell>{item.name}</TableCell>
+                                <TableCell>{item.supplier_name}</TableCell>
+                                <TableCell>{item.local_name || 'N/A'}</TableCell>
+                                <TableCell>${parseFloat(item.cost).toFixed(2)}</TableCell>
+                                <TableCell>{item.current_stock}</TableCell>
+                                <TableCell>{item.unit_of_measure}</TableCell>
+                                <TableCell>
+                                    <IconButton onClick={() => onAdjustStock(item)} title="Ajustar Stock">
+                                        <TuneIcon />
+                                    </IconButton>
+                                    <IconButton onClick={() => onEdit(item)} title="Editar Costo">
+                                        <EditIcon />
+                                    </IconButton>
+                                    <IconButton onClick={() => onDelete(item.id, 'raw')} title="Eliminar Stock">
+                                        <DeleteIcon />
+                                    </IconButton>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
             </TableContainer>
         </Box>
     );
