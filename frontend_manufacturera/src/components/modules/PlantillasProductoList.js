@@ -429,7 +429,7 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                     {formData.materials.map((material, index) => (
                         <Grid container spacing={1} key={index} alignItems="center">
                             <Grid item xs={12} sm={3}>
-                                <FormControl fullWidth>
+                                <FormControl fullWidth sx={{ minWidth: 200 }}>
                                     <InputLabel>Materia Prima</InputLabel>
                                     <Select value={material.raw_material} onChange={(e) => handleRecipeChange('materials', index, 'raw_material', e.target.value)}>
                                         {rawMaterials.map(rm => <MenuItem key={rm.id} value={rm.id}>{rm.name}</MenuItem>)}
@@ -437,7 +437,7 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                                 </FormControl>
                             </Grid>
                             <Grid item xs={12} sm={3}>
-                                <FormControl fullWidth>
+                                <FormControl fullWidth sx={{ minWidth: 200 }}>
                                     <InputLabel>Proceso</InputLabel>
                                     <Select value={material.process || ''} onChange={(e) => handleRecipeChange('materials', index, 'process', e.target.value)}>
                                         <MenuItem value=""><em>Ninguno</em></MenuItem>
@@ -467,7 +467,7 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                     {formData.processes.map((proc, index) => (
                         <Grid container spacing={2} key={index} alignItems="center">
                             <Grid item xs={4}>
-                                <FormControl fullWidth>
+                                <FormControl fullWidth sx={{ minWidth: 200 }}>
                                     <InputLabel>Proceso</InputLabel>
                                     <Select value={proc.process} onChange={(e) => handleRecipeChange('processes', index, 'process', e.target.value)}>
                                         {processes.map(p => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}

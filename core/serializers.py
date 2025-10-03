@@ -569,7 +569,7 @@ class MateriaPrimaProveedorSerializer(TenantAwareSerializer):
     raw_material = serializers.PrimaryKeyRelatedField(
         queryset=RawMaterial.objects.all()
     )
-    supplier = serializers.PrimaryKeyRelatedField(queryset=Supplier.objects.all())
+    supplier = serializers.PrimaryKeyRelatedField(queryset=Supplier.objects.all(), required=False, allow_null=True)
     brand = serializers.PrimaryKeyRelatedField(
         queryset=Brand.objects.all(), required=False, allow_null=True
     )

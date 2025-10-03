@@ -79,7 +79,21 @@ const SupplierForm = ({ onSave, onCancel, supplier, suppliers, onSelectSupplier,
             <TextField sx={{ mt: 2 }} margin="dense" name="address" label="Dirección" type="text" fullWidth value={formData.address || ''} onChange={handleChange} />
             <TextField sx={{ mt: 2 }} margin="dense" name="email" label="Email" type="email" fullWidth value={formData.email || ''} onChange={handleChange} />
             <TextField sx={{ mt: 2 }} margin="dense" name="business_sector" label="Rubro" type="text" fullWidth value={formData.business_sector || ''} onChange={handleChange} />
-            <TextField sx={{ mt: 2 }} margin="dense" name="iva_condition" label="Condición IVA" type="text" fullWidth value={formData.iva_condition || ''} onChange={handleChange} />
+            <FormControl fullWidth sx={{ mt: 2 }} margin="dense">
+                <InputLabel>Condición IVA</InputLabel>
+                <Select
+                    name="iva_condition"
+                    value={formData.iva_condition || ''}
+                    onChange={handleChange}
+                    label="Condición IVA"
+                >
+                    <MenuItem value="Responsable Inscripto">Responsable Inscripto</MenuItem>
+                    <MenuItem value="No Responsable">No Responsable</MenuItem>
+                    <MenuItem value="Exento">Exento</MenuItem>
+                    <MenuItem value="Responsable Monotributo">Responsable Monotributo</MenuItem>
+                    <MenuItem value="Monotributista Social">Monotributista Social</MenuItem>
+                </Select>
+            </FormControl>
             
             <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
                 <FormControl fullWidth>
@@ -148,6 +162,7 @@ const ProveedoresModule = () => {
     const [banks, setBanks] = useState([]);
     const [isBankFormOpen, setIsBankFormOpen] = useState(false);
     const [refreshCompras, setRefreshCompras] = useState(false); // New state for refreshing purchases
+    const [selectedSupplierForCompras, setSelectedSupplierForCompras] = useState(''); // New state for supplier selection in Compras tab
 
     const fetchSuppliers = async () => {
         try {
@@ -156,6 +171,10 @@ const ProveedoresModule = () => {
         } catch (err) {
             console.error(err);
         }
+    };
+
+    const handleSelectSupplierForCompras = (event) => {
+        setSelectedSupplierForCompras(event.target.value);
     };
 
     const fetchBanks = async () => {
@@ -247,7 +266,27 @@ const ProveedoresModule = () => {
                 <SupplierList onEdit={handleEditSupplier} refresh={refreshList} />
             </TabPanel>
             <TabPanel value={value} index={1}>
-                <ComprasProveedor onNewPurchase={handleNewPurchase} refresh={refreshCompras} suppliers={suppliers} />
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                    <InputLabel>Filtrar por Proveedor</InputLabel>
+                    <Select
+                        value={selectedSupplierForCompras}
+                        onChange={handleSelectSupplierForCompras}
+                        label="Filtrar por Proveedor"
+                    >
+                        <MenuItem value="">
+                            <em>Todos los proveedores</em>
+                        </MenuItem>
+                        {suppliers.map(s => (
+                            <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+                <ComprasProveedor 
+                    onNewPurchase={handleNewPurchase} 
+                    refresh={refreshCompras} 
+                    suppliers={suppliers} 
+                    selectedSupplierId={selectedSupplierForCompras}
+                />
             </TabPanel>
             <TabPanel value={value} index={2}>
                 <CuentaCorrienteProveedor />

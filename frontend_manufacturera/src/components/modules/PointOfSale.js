@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Button, TextField, Grid, Select, MenuItem, InputLabel, FormControl, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton, Typography, Box, Divider } from '@mui/material';
+import { Button, TextField, Grid, Select, MenuItem, InputLabel, FormControl, CircularProgress, 
+            Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton,
+            Typography, Box, Divider, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
@@ -203,6 +205,29 @@ const PointOfSale = () => {
         setNewSale({ ...newSale, applied_discount: newSale.discount_amount });
     };
 
+    const handleChequeFormChange = (e) => {
+        setChequeFormData({ ...chequeFormData, [e.target.name]: e.target.value });
+    };
+
+    const handleSaveCheque = async () => {
+        try {
+            const chequeToSave = {
+                ...chequeFormData,
+                amount: parseFloat(chequeFormData.amount),
+                bank: chequeFormData.bank || null,
+                status: 'CARGADO'
+            };
+            
+            const savedCheque = await api.create('/checks/', chequeToSave);
+            setChequeData(savedCheque);
+            setNewSale({ ...newSale, check_id: savedCheque.id });
+            setShowChequeDialog(false);
+        } catch (error) {
+            console.error("Error saving cheque", error);
+            alert(error.response?.data?.error || "Error al guardar el cheque");
+        }
+    };
+
     const handleSave = async () => {
         setError(null);
 
@@ -229,6 +254,7 @@ const PointOfSale = () => {
                 client_id: newSale.client,
                 payment_method: newSale.payment_method,
                 bank_id: newSale.bank_id || null,
+                check_id: chequeData ? chequeData.id : null,
                 local: null,
                 caja_id: newSale.caja_id,
                 items: newSale.saleItems.map(item => ({
@@ -241,6 +267,16 @@ const PointOfSale = () => {
 
             await api.create('/sales/', saleToSave);
             alert('Venta guardada exitosamente');
+            setChequeData(null);
+            setChequeFormData({
+                number: '',
+                amount: '',
+                bank: '',
+                issuer: '',
+                cuit: '',
+                due_date: '',
+                observations: ''
+            });
             setNewSale(initialSaleState);
             setSelectedQuotationId('');
         } catch (err) {
@@ -468,7 +504,20 @@ const PointOfSale = () => {
                             <Select
                                 name="payment_method"
                                 value={newSale.payment_method}
-                                onChange={(e) => setNewSale({ ...newSale, payment_method: e.target.value, bank_id: '' })}
+                                onChange={(e) => {
+                                    const methodId = e.target.value;
+                                    setNewSale({ ...newSale, payment_method: methodId, bank_id: '' });
+                                    
+                                    // Si es cheque, abrir diálogo
+                                    const method = paymentMethods.find(m => m.id === methodId);
+                                    if (method && method.name.toLowerCase() === 'cheque') {
+                                        setChequeFormData({
+                                            ...chequeFormData,
+                                            amount: newSale.net_total_amount || ''
+                                        });
+                                        setShowChequeDialog(true);
+                                    }
+                                }}
                                 label="Método de Pago *"
                             >
                                 {paymentMethods.map((method) => (
@@ -486,7 +535,7 @@ const PointOfSale = () => {
 
                     {newSale.payment_method && newSale.payment_method !== 1 && (
                         <Grid item xs={12} md={3}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth  sx={{ minWidth: 200 }}>
                                 <InputLabel>Banco *</InputLabel>
                                 <Select
                                     name="bank_id"
@@ -501,6 +550,39 @@ const PointOfSale = () => {
                                     ))}
                                 </Select>
                             </FormControl>
+                        </Grid>
+                    )}
+
+                    {newSale.payment_method && paymentMethods.find(m => m.id === newSale.payment_method)?.name.toLowerCase() === 'cheque' && (
+                        <Grid item xs={12}>
+                            {chequeData ? (
+                                <Alert severity="success" sx={{ fontWeight: 500 }}>
+                                    ✓ <strong>Cheque cargado:</strong> N° {chequeData.number} - ${parseFloat(chequeData.amount).toFixed(2)}
+                                    <br />
+                                    <strong>Banco:</strong> {banks.find(b => b.id === chequeData.bank)?.name || 'N/A'} | 
+                                    <strong> Emisor:</strong> {chequeData.issuer} | 
+                                    <strong> Vencimiento:</strong> {chequeData.due_date}
+                                    <Button 
+                                        size="small" 
+                                        onClick={() => setShowChequeDialog(true)}
+                                        sx={{ ml: 2 }}
+                                    >
+                                        Editar Cheque
+                                    </Button>
+                                </Alert>
+                            ) : (
+                                <Alert severity="warning">
+                                    ⚠️ Debe cargar los datos del cheque
+                                    <Button 
+                                        variant="contained" 
+                                        size="small" 
+                                        onClick={() => setShowChequeDialog(true)}
+                                        sx={{ ml: 2 }}
+                                    >
+                                        Cargar Cheque
+                                    </Button>
+                                </Alert>
+                            )}
                         </Grid>
                     )}
 
@@ -544,6 +626,91 @@ const PointOfSale = () => {
                     </Grid>
                 </Grid>
             </Paper>
+
+            {/* DIÁLOGO DE CHEQUE */}
+            <Dialog open={showChequeDialog} onClose={() => setShowChequeDialog(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>Datos del Cheque</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <TextField
+                            name="number"
+                            label="Número de Cheque"
+                            fullWidth
+                            value={chequeFormData.number}
+                            onChange={handleChequeFormChange}
+                            required
+                        />
+                        <TextField
+                            name="amount"
+                            label="Monto $"
+                            type="number"
+                            inputProps={{ step: "0.01", min: "0.01" }}
+                            fullWidth
+                            value={chequeFormData.amount}
+                            onChange={handleChequeFormChange}
+                            required
+                        />
+                        <FormControl fullWidth  sx={{ minWidth: 200 }}>
+                            <InputLabel>Banco</InputLabel>
+                            <Select
+                                name="bank"
+                                value={chequeFormData.bank}
+                                label="Banco"
+                                onChange={handleChequeFormChange}
+                            >
+                                <MenuItem value=""><em>Seleccione un banco</em></MenuItem>
+                                {banks.map((bank) => (
+                                    <MenuItem key={bank.id} value={bank.id}>{bank.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        <TextField
+                            name="issuer"
+                            label="Emisor/Librador"
+                            fullWidth
+                            value={chequeFormData.issuer}
+                            onChange={handleChequeFormChange}
+                            required
+                        />
+                        <TextField
+                            name="cuit"
+                            label="CUIT"
+                            fullWidth
+                            value={chequeFormData.cuit}
+                            onChange={handleChequeFormChange}
+                        />
+                        <TextField
+                            name="due_date"
+                            label="Fecha de Vencimiento"
+                            type="date"
+                            fullWidth
+                            value={chequeFormData.due_date}
+                            onChange={handleChequeFormChange}
+                            InputLabelProps={{ shrink: true }}
+                        />
+                        <TextField
+                            name="observations"
+                            label="Observaciones"
+                            fullWidth
+                            multiline
+                            rows={2}
+                            value={chequeFormData.observations}
+                            onChange={handleChequeFormChange}
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowChequeDialog(false)}>Cancelar</Button>
+                    <Button 
+                        onClick={handleSaveCheque} 
+                        variant="contained"
+                        disabled={!chequeFormData.number || !chequeFormData.amount || !chequeFormData.issuer}
+                    >
+                        Guardar Cheque
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
         </Box>
     );
 };

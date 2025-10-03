@@ -99,6 +99,7 @@ const PagosProveedor = () => {
                     setPaymentHistory(data.results || (Array.isArray(data) ? data : []));
                 } catch (err) {
                     console.error("Error fetching payment history", err);
+                    setPaymentHistory([]); // Clear movements on error
                     setError('Error al cargar el historial de pagos.');
                 } finally {
                     setLoading(false);
@@ -142,7 +143,7 @@ const PagosProveedor = () => {
             setLoading(true);
             await api.create('/payments/', paymentData);
             // Refresh purchase orders and payment history
-            const updatedPurchaseOrders = await api.list('/purchase-orders/', { supplier: selectedSupplier.id, status__in: 'Pendiente,Comprada por Pagar' });
+            const updatedPurchaseOrders = await api.list(`/purchase-orders/?supplier=${selectedSupplier.id}&status__in=Pendiente,Comprada por Pagar`);
             setPurchaseOrders(updatedPurchaseOrders.results || (Array.isArray(updatedPurchaseOrders) ? updatedPurchaseOrders : []));
             const updatedPaymentHistory = await api.list('/payments/', { purchase_order: selectedPurchaseOrder.id });
             setPaymentHistory(updatedPaymentHistory.results || (Array.isArray(updatedPaymentHistory) ? updatedPaymentHistory : []));

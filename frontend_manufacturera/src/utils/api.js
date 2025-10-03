@@ -1,8 +1,8 @@
 import axiosInstance from './axiosInstance';
 
 // Generic API functions
-export const list = async (endpoint) => {
-    const response = await axiosInstance.get(endpoint);
+export const list = async (endpoint, params = {}) => {
+    const response = await axiosInstance.get(endpoint, { params });
     return response.data;
 };
 

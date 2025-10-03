@@ -8,7 +8,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import * as api from '../../utils/api';
 import NewPurchaseForm from './NewPurchaseForm'; // Import the form for editing
 
-const ComprasProveedor = ({ onNewPurchase, refresh, suppliers }) => {
+const ComprasProveedor = ({ onNewPurchase, refresh, suppliers, selectedSupplierId }) => {
     const [purchases, setPurchases] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -18,7 +18,8 @@ const ComprasProveedor = ({ onNewPurchase, refresh, suppliers }) => {
     const fetchPurchases = async () => {
         try {
             setLoading(true);
-            const data = await api.list('/purchase-orders/');
+            const params = selectedSupplierId ? { supplier: selectedSupplierId } : {};
+            const data = await api.list('/purchase-orders/', params);
             setPurchases(Array.isArray(data) ? data : data.results || []);
             setError(null);
         } catch (err) {
@@ -31,7 +32,7 @@ const ComprasProveedor = ({ onNewPurchase, refresh, suppliers }) => {
 
     useEffect(() => {
         fetchPurchases();
-    }, [refresh]); // Re-fetch when refresh prop changes
+    }, [refresh, selectedSupplierId]); // Re-fetch when refresh or selectedSupplierId changes
 
     const handleEdit = (purchase) => {
         setSelectedPurchase(purchase);

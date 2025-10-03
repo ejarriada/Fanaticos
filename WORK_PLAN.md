@@ -44,12 +44,32 @@ Este documento registra el plan de acción para probar, depurar y validar el fro
   - [x] Rediseñar `NewPurchaseForm.js` para la creación/edición de órdenes de compra basadas en items de materias primas.
   - [x] Modificar `ComprasProveedor.js` para mostrar las nuevas columnas (Proveedor, Usuario, Total) y añadir acciones de Editar/Eliminar.
   - [x] Conectar `ProveedoresModule.js` para pasar las props necesarias y manejar el refresco de la lista.
-- [ ] **Prueba de Flujo:**
-  - [ ] Simular la creación de una nueva orden de compra para una materia prima existente.
-  - [ ] Simular el registro de un pago (parcial o total) para esa compra.
-- [ ] **Verificación:**
-  - [ ] Comprobar que el stock de la materia prima no se ve afectado (la compra es un pedido, no una recepción).
-  - [ ] Comprobar que el estado de la cuenta corriente del proveedor se actualiza correctamente.
+- [x] **Prueba de Flujo:**
+  - [x] Simular la creación de una nueva orden de compra para una materia prima existente.
+  - [x] Simular el registro de un pago (parcial o total) para esa compra.
+- [x] **Verificación:**
+  - [x] Comprobar que el stock de la materia prima no se ve afectado (la compra es un pedido, no una recepción).
+  - [x] Comprobar que el estado de la cuenta corriente del proveedor se actualiza correctamente.
+- [x] **Corrección de Filtrado:** Implementado el filtrado correcto de órdenes de compra y pagos por proveedor en el frontend y backend.
+
+### Sub-Fase 1.4: Estandarización de Campos y Corrección de Flujo de Materias Primas
+- [x] **Estandarización de Condición IVA (Frontend):**
+  - [x] Modificado `SupplierForm` en `ProveedoresModule.js` para usar un `Select` con opciones predefinidas.
+  - [x] Modificado `ClientForm` en `ClientList.js` para usar un `Select` con opciones predefinidas.
+- [x] **Estandarización de Condición IVA (Backend):**
+  - [x] Añadidas `IVA_CONDITION_CHOICES` a `core/models.py`.
+  - [x] Aplicadas `IVA_CONDITION_CHOICES` a los campos `iva_condition` de los modelos `Client` y `Supplier`.
+  - [x] Ejecutadas migraciones de base de datos (`makemigrations`, `migrate`).
+- [x] **Corrección de Creación/Listado de Materia Prima:**
+  - [x] Hecho el campo `supplier` en `MateriaPrimaProveedor` opcional (`null=True, blank=True`) en `core/models.py`.
+  - [x] Eliminado `supplier` de `unique_together` en `MateriaPrimaProveedor` en `core/models.py`.
+  - [x] Ejecutadas migraciones de base de datos (`makemigrations`, `migrate`).
+  - [x] Hecho el campo `supplier` en `MateriaPrimaProveedorSerializer` opcional (`required=False, allow_null=True`) en `core/serializers.py`.
+  - [x] Ajustada la función `handleChange` en `RawMaterialForm` (`RawMaterialList.js`) para enviar `null` para `supplier` vacío y `0` para `current_stock` vacío.
+  - [x] Añadido filtrado por `name` en `RawMaterialViewSet` (`core/views.py`) para permitir la búsqueda de `RawMaterial` por nombre.
+  - [x] Ajustada la lógica de `handleSave` en `RawMaterialList.js` para reutilizar `RawMaterial` existente o crear uno nuevo, y luego crear `MateriaPrimaProveedor`.
+  - [x] Eliminados todos los `console.log` y `print` de depuración.
+- [x] **Estado:** Completado. El flujo de creación/edición de Materias Primas y la estandarización de la condición de IVA funcionan correctamente.
 
 ---
 

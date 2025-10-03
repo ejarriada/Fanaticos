@@ -197,6 +197,13 @@ class RawMaterialViewSet(TenantAwareViewSet):
     queryset = RawMaterial.objects.all()
     serializer_class = RawMaterialSerializer
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        name = self.request.query_params.get('name')
+        if name:
+            queryset = queryset.filter(name__iexact=name) # Use __iexact for case-insensitive match
+        return queryset
+
 class BrandViewSet(TenantAwareViewSet):
     queryset = Brand.objects.all()
     serializer_class = BrandSerializer
@@ -473,6 +480,13 @@ class PurchaseOrderViewSet(TenantAwareViewSet):
     queryset = PurchaseOrder.objects.all()
     serializer_class = PurchaseOrderSerializer
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        supplier_id = self.request.query_params.get('supplier')
+        if supplier_id:
+            queryset = queryset.filter(supplier_id=supplier_id)
+        return queryset
+
     def perform_create(self, serializer):
         tenant = self.get_tenant()
         serializer.save(tenant=tenant, user=self.request.user)
@@ -723,7 +737,16 @@ class ContactViewSet(TenantAwareViewSet):
     serializer_class = ContactSerializer
 
 class InvoiceViewSet(TenantAwareViewSet): queryset = Invoice.objects.all(); serializer_class = InvoiceSerializer
-class PaymentViewSet(TenantAwareViewSet): queryset = Payment.objects.all(); serializer_class = PaymentSerializer
+class PaymentViewSet(TenantAwareViewSet):
+    queryset = Payment.objects.all()
+    serializer_class = PaymentSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        purchase_order_id = self.request.query_params.get('purchase_order')
+        if purchase_order_id:
+            queryset = queryset.filter(purchase_order_id=purchase_order_id)
+        return queryset
 class BankStatementViewSet(TenantAwareViewSet): queryset = BankStatement.objects.all(); serializer_class = BankStatementSerializer
 class BankTransactionViewSet(TenantAwareViewSet): queryset = BankTransaction.objects.all(); serializer_class = BankTransactionSerializer
 class BankViewSet(TenantAwareViewSet): queryset = Bank.objects.all(); serializer_class = BankSerializer

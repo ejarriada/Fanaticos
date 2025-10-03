@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
     Box, Button, Paper, Table, TableBody, TableCell, TableContainer, 
     TableHead, TableRow, IconButton, Typography, Dialog, DialogActions, 
-    DialogContent, DialogTitle, TextField, CircularProgress, Alert 
+    DialogContent, DialogTitle, TextField, CircularProgress, Alert, 
+    FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -90,7 +91,21 @@ const ClientForm = ({ open, onClose, onSave, client }) => {
                 <TextField margin="dense" name="address" label="Dirección" type="text" fullWidth value={formData.address || ''} onChange={handleChange} />
                 <TextField margin="dense" name="city" label="Ciudad" type="text" fullWidth value={formData.city || ''} onChange={handleChange} />
                 <TextField margin="dense" name="province" label="Provincia" type="text" fullWidth value={formData.province || ''} onChange={handleChange} />
-                <TextField margin="dense" name="iva_condition" label="Condición IVA" type="text" fullWidth value={formData.iva_condition || ''} onChange={handleChange} />
+                <FormControl fullWidth margin="dense">
+                    <InputLabel>Condición IVA</InputLabel>
+                    <Select
+                        name="iva_condition"
+                        value={formData.iva_condition || ''}
+                        onChange={handleChange}
+                        label="Condición IVA"
+                    >
+                        <MenuItem value="Responsable Inscripto">Responsable Inscripto</MenuItem>
+                        <MenuItem value="No Responsable">No Responsable</MenuItem>
+                        <MenuItem value="Exento">Exento</MenuItem>
+                        <MenuItem value="Responsable Monotributo">Responsable Monotributo</MenuItem>
+                        <MenuItem value="Monotributista Social">Monotributista Social</MenuItem>
+                    </Select>
+                </FormControl>
                 <TextField margin="dense" name="details" label="Detalles" type="text" fullWidth multiline rows={3} value={formData.details || ''} onChange={handleChange} />
 
                 <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>Contactos</Typography>

@@ -64,7 +64,7 @@ class Warehouse(models.Model):
 
 class MateriaPrimaProveedor(TenantAwareModel):
     raw_material = models.ForeignKey(RawMaterial, on_delete=models.CASCADE, related_name="proveedores")
-    supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE, related_name="materias_primas")
+    supplier = models.ForeignKey('Supplier', on_delete=models.SET_NULL, null=True, blank=True, related_name="materias_primas")
     warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, related_name='raw_materials', null=True, blank=True)
     supplier_code = models.CharField(max_length=100, blank=True, null=True)
     brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True)
@@ -74,7 +74,7 @@ class MateriaPrimaProveedor(TenantAwareModel):
     qr_code_data = models.TextField(blank=True, null=True) # Field for storing QR code image data
 
     class Meta:
-        unique_together = ('raw_material', 'supplier', 'warehouse', 'tenant')
+        unique_together = ('raw_material', 'warehouse', 'tenant')
 
     def __str__(self):
         return f"{self.raw_material.name} - {self.supplier.name} ({self.local.name if self.local else 'Sin Ubicación'})"
@@ -195,6 +195,14 @@ class ProductFile(TenantAwareModel):
         return f"File for {self.product.name}"
 
 
+IVA_CONDITION_CHOICES = [
+    ('Responsable Inscripto', 'Responsable Inscripto'),
+    ('No Responsable', 'No Responsable'),
+    ('Exento', 'Exento'),
+    ('Responsable Monotributo', 'Responsable Monotributo'),
+    ('Monotributista Social', 'Monotributista Social'),
+]
+
 # --- Commercial Flow Models (Quote, Sale, Delivery) ---
 
 class Client(TenantAwareModel):
@@ -205,7 +213,7 @@ class Client(TenantAwareModel):
     address = models.CharField(max_length=255, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
     province = models.CharField(max_length=100, blank=True, null=True)
-    iva_condition = models.CharField(max_length=100, blank=True, null=True)
+    iva_condition = models.CharField(max_length=100, blank=True, null=True, choices=IVA_CONDITION_CHOICES)
     details = models.TextField(blank=True, null=True)
 
     def __str__(self):
@@ -456,7 +464,7 @@ class Supplier(TenantAwareModel):
     address = models.CharField(max_length=255, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     business_sector = models.CharField(max_length=100, blank=True, null=True)
-    iva_condition = models.CharField(max_length=50, blank=True, null=True)
+    iva_condition = models.CharField(max_length=50, blank=True, null=True, choices=IVA_CONDITION_CHOICES)
     bank = models.CharField(max_length=100, blank=True, null=True)
     account_number = models.CharField(max_length=50, blank=True, null=True)
     delivery_available = models.BooleanField(default=False)

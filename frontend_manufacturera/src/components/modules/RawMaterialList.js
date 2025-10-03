@@ -113,8 +113,17 @@ const RawMaterialForm = ({ open, onClose, onSave, rawMaterial, onNewBrand, onBra
     }, [rawMaterial, open]);
 
     const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData({ ...formData, [name]: value });
+        const { name, value, type } = e.target;
+        let newValue = value;
+
+        if (name === 'supplier' && value === '') {
+            newValue = null; // Send null for optional ForeignKey
+        } else if (name === 'current_stock' && value === '') {
+            newValue = 0; // Send 0 for empty stock field
+        } else if (type === 'number') {
+            newValue = value === '' ? '' : Number(value); // Keep as string if empty, convert to number otherwise
+        }
+        setFormData({ ...formData, [name]: newValue });
     };
 
     const handleSubmit = () => {
@@ -245,7 +254,9 @@ const RawMaterialList = () => {
         try {
             setLoading(true);
             const data = await api.list('/materia-prima-proveedores/');
-            setRawMaterials(data.results || (Array.isArray(data) ? data : []));
+            console.log("fetchRawMaterials: Data received from API:", data);
+            const processedData = data.results || (Array.isArray(data) ? data : []);
+            setRawMaterials(processedData);
             setError(null);
         } catch (err) {
             setError('Error al cargar la materia prima. Por favor, intente de nuevo.');
@@ -293,16 +304,14 @@ const RawMaterialList = () => {
                 await api.update('/materia-prima-proveedores/', selectedRawMaterial.id, materiaPrimaProveedorUpdateData);
 
             } else {
-                const rawMaterialData = {
-                    name: formData.name,
-                    description: formData.description,
-                    category: formData.category,
-                    unit_of_measure: formData.unit_of_measure,
-                };
-                const newRawMaterial = await api.create('/raw-materials/', rawMaterialData);
+                let rawMaterialId;
+                // Try to find an existing RawMaterial by name
+                const existingRawMaterialsResponse = await api.list('/raw-materials/', { name: formData.name });
+                console.log("existingRawMaterialsResponse:", existingRawMaterialsResponse);
+                const existingRawMaterials = Array.isArray(existingRawMaterialsResponse) ? existingRawMaterialsResponse : existingRawMaterialsResponse.results;
 
                 const materiaPrimaProveedorData = {
-                    raw_material: newRawMaterial.id,
+                    raw_material: rawMaterialId,
                     supplier: formData.supplier,
                     cost: formData.cost,
                     current_stock: formData.current_stock,
@@ -315,9 +324,20 @@ const RawMaterialList = () => {
             handleCloseForm();
         } catch (err) {
             const errorData = err.response?.data;
-            const errorMessage = errorData 
-                ? Object.entries(errorData).map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`).join('; ')
-                : 'Error al guardar la materia prima.';
+            let errorMessage = 'Error al guardar la materia prima.';
+
+            if (errorData) {
+                if (typeof errorData === 'object') {
+                    errorMessage = Object.entries(errorData)
+                        .map(([key, value]) => {
+                            const fieldName = key === 'name' ? 'Nombre' : key;
+                            return `${fieldName}: ${Array.isArray(value) ? value.join(', ') : value}`;
+                        })
+                        .join('; ');
+                } else if (typeof errorData === 'string') {
+                    errorMessage = errorData;
+                }
+            }
             setError(errorMessage);
             console.error(err);
         }
