@@ -201,7 +201,7 @@ class RawMaterialViewSet(TenantAwareViewSet):
         queryset = super().get_queryset()
         name = self.request.query_params.get('name')
         if name:
-            queryset = queryset.filter(name__iexact=name) # Use __iexact for case-insensitive match
+            queryset = queryset.filter(name__iexact=name)
         return queryset
 
 class BrandViewSet(TenantAwareViewSet):
@@ -222,21 +222,25 @@ class MateriaPrimaProveedorViewSet(TenantAwareViewSet):
     def generate_qr_code(self, request, pk=None):
         sourced_material = self.get_object()
         raw_material = sourced_material.raw_material
-
+        
         # Calculate total stock for this raw material across all suppliers
         total_stock = MateriaPrimaProveedor.objects.filter(
             raw_material=raw_material,
             tenant=sourced_material.tenant
         ).aggregate(total=Sum('current_stock'))['total'] or 0
-
+        
+        # Manejar proveedor opcional
+        supplier_name = sourced_material.supplier.name if sourced_material.supplier else 'Sin proveedor'
+        batch_number = sourced_material.batch_number if sourced_material.batch_number else 'Sin lote'
+        
         qr_data_str = (
             f"Material: {raw_material.name}\n"
-            f"Proveedor: {sourced_material.supplier.name}\n"
-            f"Lote: {sourced_material.batch_number}\n"
+            f"Proveedor: {supplier_name}\n"
+            f"Lote: {batch_number}\n"
             f"Stock del Lote: {sourced_material.current_stock}\n"
             f"Stock Total (Material): {total_stock}"
         )
-
+        
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -245,15 +249,15 @@ class MateriaPrimaProveedorViewSet(TenantAwareViewSet):
         )
         qr.add_data(qr_data_str)
         qr.make(fit=True)
-
+        
         img = qr.make_image(fill_color="black", back_color="white")
         buffer = BytesIO()
         img.save(buffer, format="PNG")
         qr_code_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-
+        
         sourced_material.qr_code_data = qr_code_base64
         sourced_material.save()
-
+        
         return Response({'qr_code_data': qr_code_base64}, status=status.HTTP_200_OK)
 
 

@@ -535,7 +535,7 @@ const PointOfSale = () => {
 
                     {newSale.payment_method && newSale.payment_method !== 1 && (
                         <Grid item xs={12} md={3}>
-                            <FormControl fullWidth  sx={{ minWidth: 200 }}>
+                            <FormControl fullWidth sx={{ minWidth: 200 }}>
                                 <InputLabel>Banco *</InputLabel>
                                 <Select
                                     name="bank_id"

@@ -17,6 +17,7 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
     const [designFiles, setDesignFiles] = useState([]);
     const [estimatedCost, setEstimatedCost] = useState(0);
     const [rawMaterials, setRawMaterials] = useState([]);
+    const [rawMaterialsWithCost, setRawMaterialsWithCost] = useState([]);
     const [processes, setProcesses] = useState([]);
     const [categories, setCategories] = useState([]);
     const [sizes, setSizes] = useState([]);
@@ -53,7 +54,7 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
         if (window.confirm('¿Está seguro de que desea eliminar este archivo?')) {
             try {
                 await api.remove('/design-files/', fileId);
-                onSave(null, true); // A special call to onSave to just refresh the data
+                onSave(null, true);
             } catch (err) {
                 console.error('Error deleting file:', err);
             }
@@ -104,15 +105,22 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
         const fetchDependencies = async () => {
             try {
                 setLoadingDependencies(true);
-                const [rawMaterialsData, processesData, categoriesData, sizesData] = await Promise.all([
+                const [rawMaterialsData, rawMaterialsProveedorData, processesData, categoriesData, sizesData] = await Promise.all([
                     api.list('/raw-materials/'),
+                    api.list('/materia-prima-proveedores/'),
                     api.list('/processes/'),
                     api.list('/categories/'),
                     api.list('/sizes/'),
                 ]);
+                
                 setRawMaterials(Array.isArray(rawMaterialsData) ? rawMaterialsData : rawMaterialsData.results || []);
+                
+                const materialsWithCost = Array.isArray(rawMaterialsProveedorData) ? rawMaterialsProveedorData : rawMaterialsProveedorData.results || [];
+                setRawMaterialsWithCost(materialsWithCost);
+                
                 console.log('Fetched rawMaterialsData:', rawMaterialsData);
-                console.log('Raw Materials state after setting:', (Array.isArray(rawMaterialsData) ? rawMaterialsData : rawMaterialsData.results || []));
+                console.log('Fetched rawMaterialsProveedorData with costs:', materialsWithCost);
+                
                 setProcesses(Array.isArray(processesData) ? processesData : processesData.results || []);
                 setCategories(Array.isArray(categoriesData) ? categoriesData : categoriesData.results || []);
                 console.log('Fetched categoriesData:', categoriesData);
@@ -133,17 +141,15 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
 
     useEffect(() => {
         if (product) {
-            // When a product is loaded for editing, we need to transform the data
-            // from the serializer's shape to the form's internal state shape.
             const transformedMaterials = product.materials?.map(m => ({
                 ...m,
-                unit_cost: m.cost, // Store unit cost from backend
-                raw_material_cost: (parseFloat(m.cost) * parseFloat(m.quantity)).toFixed(2), // Calculate total cost for display
+                unit_cost: m.cost,
+                raw_material_cost: (parseFloat(m.cost) * parseFloat(m.quantity)).toFixed(2),
             })) || [];
 
             const transformedProcesses = product.processes?.map(p => ({
                 ...p,
-                process_cost: p.cost || 0, // Map backend 'cost' to frontend 'process_cost'
+                process_cost: p.cost || 0,
             })) || [];
             setDesignFiles([]);
             setFormData({
@@ -156,7 +162,7 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                 sizes: product.sizes ? product.sizes.map(s => s.id) : [],
             });
         } else {
-            setFormData({ name: '', description: '', materials: [], processes: [], category: '', sizes: [] });
+            setFormData({ name: '', product_code: '', description: '', materials: [], processes: [], category: '', sizes: [] });
             setDesignFiles([]);
         }
     }, [product, open]);
@@ -169,7 +175,6 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
 
         let processCost = 0;
         formData.processes.forEach(proc => {
-            // Directly use proc.cost, which is the value from the form state (saved/loaded from DesignProcess)
             processCost += parseFloat(proc.process_cost || 0);
         });
 
@@ -199,13 +204,28 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
         if (type === 'materials') {
             const material = newItems[index];
             if (field === 'raw_material' || field === 'quantity') {
-                const selectedRawMaterial = rawMaterials.find(rm => rm.id === material.raw_material); // Now finding RawMaterial
+                const selectedRawMaterial = rawMaterials.find(rm => rm.id === material.raw_material);
+                
                 if (selectedRawMaterial && material.quantity) {
-                    const highestCost = parseFloat(selectedRawMaterial.highest_cost); // Use highest_cost from RawMaterial
+                    const materialsFromProviders = rawMaterialsWithCost.filter(
+                        mp => mp.raw_material === selectedRawMaterial.id
+                    );
+                    
+                    let highestCost = 0;
+                    
+                    if (materialsFromProviders.length > 0) {
+                        highestCost = Math.max(...materialsFromProviders.map(mp => parseFloat(mp.cost || 0)));
+                        console.log(`Material: ${selectedRawMaterial.name}, Highest Cost: ${highestCost}, Quantity: ${material.quantity}`);
+                    } else {
+                        console.warn(`No se encontraron costos para la materia prima: ${selectedRawMaterial.name}`);
+                    }
 
-                    newItems[index].unit_cost = highestCost; // Store unit cost
-                    newItems[index].raw_material_cost = (highestCost * parseFloat(material.quantity)).toFixed(2); // Calculate total cost for display
+                    newItems[index].unit_cost = highestCost;
+                    newItems[index].raw_material_cost = (highestCost * parseFloat(material.quantity)).toFixed(2);
+                    
+                    console.log(`Calculated cost for ${selectedRawMaterial.name}: ${newItems[index].raw_material_cost}`);
                 } else {
+                    newItems[index].unit_cost = 0;
                     newItems[index].raw_material_cost = '0.00';
                 }
             }
@@ -223,7 +243,7 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
 
     const addRecipeItem = (type) => {
         const newItem = type === 'materials'
-            ? { raw_material: '', quantity: '', process: '', raw_material_cost: 0 }
+            ? { raw_material: '', quantity: '', process: '', raw_material_cost: 0, unit_cost: 0 }
             : { process: '', order: formData.processes.length + 1, process_cost: 0 };
         setFormData(prev => ({ ...prev, [type]: [...prev[type], newItem] }));
     };
@@ -346,8 +366,19 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
         );
     }
 
+    if (dependenciesError) {
+        return (
+            <Dialog open={open} onClose={onClose}>
+                <DialogTitle>Error</DialogTitle>
+                <DialogContent>
+                    <Alert severity="error">{dependenciesError}</Alert>
+                </DialogContent>
+            </Dialog>
+        );
+    }
+
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg"> {/* Changed to lg */}
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
             <DialogTitle>{product ? 'Editar Plantilla de Producto' : 'Nueva Plantilla de Producto'}</DialogTitle>
             <DialogContent>
                 <TextField margin="dense" name="name" label="Nombre" type="text" fullWidth value={formData.name} onChange={handleFormChange} />
@@ -488,16 +519,16 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                 </Stack>
                 <Button startIcon={<AddIcon />} onClick={() => addRecipeItem('processes')} sx={{ mt: 1 }}>Añadir Proceso</Button>
 
+                <TextField
+                    margin="dense"
+                    label="Costo Estimado"
+                    type="number"
+                    fullWidth
+                    value={estimatedCost.toFixed(2)}
+                    InputProps={{ readOnly: true }}
+                    sx={{ mt: 2, mb: 2 }}
+                />
             </DialogContent>
-            <TextField
-                margin="dense"
-                label="Costo Estimado"
-                type="number"
-                fullWidth
-                value={estimatedCost.toFixed(2)}
-                InputProps={{ readOnly: true }}
-                sx={{ mt: 2, mb: 2 }}
-            />
             <DialogActions>
                 <Button onClick={onClose}>Cancelar</Button>
                 <Button onClick={handleSubmit}>Guardar</Button>

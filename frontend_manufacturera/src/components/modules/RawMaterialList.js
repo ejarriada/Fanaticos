@@ -307,16 +307,33 @@ const RawMaterialList = () => {
                 let rawMaterialId;
                 // Try to find an existing RawMaterial by name
                 const existingRawMaterialsResponse = await api.list('/raw-materials/', { name: formData.name });
-                console.log("existingRawMaterialsResponse:", existingRawMaterialsResponse);
-                const existingRawMaterials = Array.isArray(existingRawMaterialsResponse) ? existingRawMaterialsResponse : existingRawMaterialsResponse.results;
+                const existingRawMaterials = Array.isArray(existingRawMaterialsResponse) 
+                    ? existingRawMaterialsResponse 
+                    : existingRawMaterialsResponse.results || [];
 
+                if (existingRawMaterials.length > 0) {
+                    // Si existe, usar el ID existente
+                    rawMaterialId = existingRawMaterials[0].id;
+                } else {
+                    // Si no existe, crear la materia prima base primero
+                    const rawMaterialData = {
+                        name: formData.name,
+                        description: formData.description,
+                        category: formData.category,
+                        unit_of_measure: formData.unit_of_measure,
+                    };
+                    const newRawMaterial = await api.create('/raw-materials/', rawMaterialData);
+                    rawMaterialId = newRawMaterial.id;
+                }
+
+                // Ahora sí, crear la relación materia-prima-proveedor con el ID correcto
                 const materiaPrimaProveedorData = {
                     raw_material: rawMaterialId,
-                    supplier: formData.supplier,
-                    cost: formData.cost,
-                    current_stock: formData.current_stock,
-                    brand: formData.brand,
-                    warehouse: formData.warehouse,
+                    supplier: formData.supplier || null,
+                    cost: formData.cost || 0,
+                    current_stock: formData.current_stock || 0,
+                    brand: formData.brand || null,
+                    warehouse: formData.warehouse || null,
                 };
                 await api.create('/materia-prima-proveedores/', materiaPrimaProveedorData);
             }
