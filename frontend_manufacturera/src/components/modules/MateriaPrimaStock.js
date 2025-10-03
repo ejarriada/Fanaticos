@@ -48,9 +48,7 @@ const MateriaPrimaStock = ({ onAdjustStock, onDelete, onEdit, refreshKey }) => {
                             <TableCell>Materia Prima</TableCell>
                             <TableCell>Proveedor</TableCell>
                             <TableCell>Almacén</TableCell>
-                            <TableCell>Costo</TableCell>
                             <TableCell>Stock Actual</TableCell>
-                            <TableCell>Unidad</TableCell>
                             <TableCell>Acciones</TableCell>
                         </TableRow>
                     </TableHead>
@@ -59,10 +57,8 @@ const MateriaPrimaStock = ({ onAdjustStock, onDelete, onEdit, refreshKey }) => {
                             <TableRow key={item.id}>
                                 <TableCell>{item.name}</TableCell>
                                 <TableCell>{item.supplier_name}</TableCell>
-                                <TableCell>{item.local_name || 'N/A'}</TableCell>
-                                <TableCell>${parseFloat(item.cost).toFixed(2)}</TableCell>
+                                <TableCell>{item.warehouse_name || 'Sin asignar'}</TableCell>
                                 <TableCell>{item.current_stock}</TableCell>
-                                <TableCell>{item.unit_of_measure}</TableCell>
                                 <TableCell>
                                     <IconButton onClick={() => onAdjustStock(item)} title="Ajustar Stock">
                                         <TuneIcon />

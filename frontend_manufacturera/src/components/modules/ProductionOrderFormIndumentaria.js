@@ -377,7 +377,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                 <Section title="Datos del Pedido">
                     <Grid container spacing={3}>
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Producto Base</InputLabel>
                                 <Select
                                     value={formData.base_product || ''}
@@ -395,7 +395,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Escudo</InputLabel>
                                 <Select
                                     value={formData.customization_details?.escudo || ''}
@@ -412,7 +412,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Marca/Sponsor</InputLabel>
                                 <Select
                                     value={formData.customization_details?.marca || ''}
@@ -429,7 +429,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Número</InputLabel>
                                 <Select
                                     value={formData.customization_details?.numero || ''}
@@ -445,7 +445,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Nombre</InputLabel>
                                 <Select
                                     value={formData.customization_details?.nombre || ''}
@@ -461,7 +461,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Lugar del Nombre</InputLabel>
                                 <Select
                                     value={formData.customization_details?.lugar_nombre || ''}
@@ -477,7 +477,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Color de Tela</InputLabel>
                                 <Select
                                     value={formData.customization_details?.color_tela || ''}
@@ -495,7 +495,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Tipo de Tela</InputLabel>
                                 <Select
                                     value={formData.customization_details?.tela || ''}
@@ -513,7 +513,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Tipo de Cuello</InputLabel>
                                 <Select
                                     value={formData.customization_details?.cuello || ''}
@@ -530,7 +530,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
 
                         {/* Campos adicionales según la especificación */}
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Color Feston</InputLabel>
                                 <Select
                                     value={formData.customization_details?.color_feston || ''}
@@ -548,7 +548,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Color Marca</InputLabel>
                                 <Select
                                     value={formData.customization_details?.color_marca || ''}
@@ -566,7 +566,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Color TurboDry</InputLabel>
                                 <Select
                                     value={formData.customization_details?.color_turbodry || ''}
@@ -584,7 +584,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Color Talles</InputLabel>
                                 <Select
                                     value={formData.customization_details?.color_talles || ''}
@@ -640,7 +640,7 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
                 <Section title="Plantilla de Talles">
                     <Grid container spacing={3}>
                         <Grid item xs={12} md={3}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Talle</InputLabel>
                                 <Select
                                     value={currentItem.size}

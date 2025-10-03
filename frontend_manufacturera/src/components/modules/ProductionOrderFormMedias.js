@@ -320,7 +320,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                                 />
                             </Grid>
                             <Grid item xs={12} md={6}>
-                                <FormControl fullWidth>
+                                <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                     <InputLabel>Vendedor</InputLabel>
                                     <Select
                                         value={formData.seller_id || ''}
@@ -344,7 +344,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                 <Section title="Datos del Pedido">
                     <Grid container spacing={3}>
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Producto</InputLabel>
                                 <Select
                                     value={formData.base_product_id || ''}
@@ -392,7 +392,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                 <Section title="Plantilla de Talles">
                     <Grid container spacing={3}>
                         <Grid item xs={12} md={3}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Talle</InputLabel>
                                 <Select
                                     value={currentItem.size}
@@ -489,7 +489,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                 <Section title="Colores">
                     <Grid container spacing={3}>
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Color Base</InputLabel>
                                 <Select
                                     value={formData.colors?.base || ''}
@@ -507,7 +507,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Color Secundario</InputLabel>
                                 <Select
                                     value={formData.colors?.secundario || ''}
@@ -525,7 +525,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Color Puño</InputLabel>
                                 <Select
                                     value={formData.colors?.puno || ''}
@@ -543,7 +543,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Color Puntera</InputLabel>
                                 <Select
                                     value={formData.colors?.puntera || ''}
@@ -561,7 +561,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth>
+                            <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                 <InputLabel>Color Talón</InputLabel>
                                 <Select
                                     value={formData.colors?.talon || ''}

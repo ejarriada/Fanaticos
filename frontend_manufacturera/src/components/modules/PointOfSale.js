@@ -12,13 +12,26 @@ const PointOfSale = () => {
     const [clients, setClients] = useState([]);
     const [quotations, setQuotations] = useState([]);
     const [selectedQuotationId, setSelectedQuotationId] = useState('');
-
-    const paymentOptions = ['Efectivo', 'Cheque', 'Cuenta Corriente'];
+    const [paymentMethods, setPaymentMethods] = useState([]);
+    const [banks, setBanks] = useState([]);
+    const [showChequeDialog, setShowChequeDialog] = useState(false);
+    const [chequeData, setChequeData] = useState(null);
+    const [chequeFormData, setChequeFormData] = useState({
+        number: '',
+        amount: '',
+        bank: '',
+        issuer: '',
+        cuit: '',
+        due_date: '',
+        observations: ''
+    });
 
     const initialSaleState = {
         client: '',
         payment_method: '',
+        bank_id: '',
         caja_id: '',
+        check_id: null,
         saleItems: [],
         total_amount: 0,
         discount_reason: '',
@@ -38,17 +51,21 @@ const PointOfSale = () => {
         const fetchInitialData = async () => {
             try {
                 setLoading(true);
-                const [productsData, clientsData, cajasData, quotationsData] = await Promise.all([
+                const [productsData, clientsData, cajasData, quotationsData, paymentMethodsData, banksData] = await Promise.all([
                     api.list('/products/'),
                     api.list('/clients/'),
                     api.list('/cash-registers/'),
                     api.list('/quotations/?status=Pendiente'),
+                    api.list('/payment-method-types/'),
+                    api.list('/banks/'),
                 ]);
 
                 setProducts(Array.isArray(productsData) ? productsData : productsData.results || []);
                 setClients(Array.isArray(clientsData) ? clientsData : clientsData.results || []);
                 setQuotations(Array.isArray(quotationsData) ? quotationsData : quotationsData.results || []);
-                
+                setPaymentMethods(Array.isArray(paymentMethodsData) ? paymentMethodsData : paymentMethodsData.results || []);
+                setBanks(Array.isArray(banksData) ? banksData : banksData.results || []);
+
                 const singleCaja = Array.isArray(cajasData) && cajasData.length > 0 ? cajasData[0] : (cajasData.results && cajasData.results.length > 0 ? cajasData.results[0] : null);
                 if (singleCaja) {
                     initialSaleState.caja_id = singleCaja.id;
@@ -202,10 +219,16 @@ const PointOfSale = () => {
             return;
         }
 
+        if (newSale.payment_method !== 1 && !newSale.bank_id) {
+            setError("Debe seleccionar un banco para este método de pago.");
+            return;
+        }
+
         try {
             const saleToSave = {
                 client_id: newSale.client,
                 payment_method: newSale.payment_method,
+                bank_id: newSale.bank_id || null,
                 local: null,
                 caja_id: newSale.caja_id,
                 items: newSale.saleItems.map(item => ({
@@ -445,12 +468,12 @@ const PointOfSale = () => {
                             <Select
                                 name="payment_method"
                                 value={newSale.payment_method}
-                                onChange={(e) => setNewSale({ ...newSale, payment_method: e.target.value })}
+                                onChange={(e) => setNewSale({ ...newSale, payment_method: e.target.value, bank_id: '' })}
                                 label="Método de Pago *"
                             >
-                                {paymentOptions.map((method) => (
-                                    <MenuItem key={method} value={method}>
-                                        {method}
+                                {paymentMethods.map((method) => (
+                                    <MenuItem key={method.id} value={method.id}>
+                                        {method.name}
                                     </MenuItem>
                                 ))}
                             </Select>
@@ -460,6 +483,26 @@ const PointOfSale = () => {
                     <Grid item xs={12}>
                         <Divider sx={{ my: 2 }} />
                     </Grid>
+
+                    {newSale.payment_method && newSale.payment_method !== 1 && (
+                        <Grid item xs={12} md={3}>
+                            <FormControl fullWidth>
+                                <InputLabel>Banco *</InputLabel>
+                                <Select
+                                    name="bank_id"
+                                    value={newSale.bank_id}
+                                    onChange={(e) => setNewSale({ ...newSale, bank_id: e.target.value })}
+                                    label="Banco *"
+                                >
+                                    {banks.map((bank) => (
+                                        <MenuItem key={bank.id} value={bank.id}>
+                                            {bank.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                    )}
 
                     <Grid item xs={12} md={3}>
                         <Box sx={{ textAlign: { xs: 'center', pt: 1 } }}>
