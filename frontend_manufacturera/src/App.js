@@ -19,7 +19,7 @@ import ProductionOrderManagement from './components/modules/ProductionOrderManag
 import MateriasPrimasModule from './components/modules/MateriasPrimasModule';
 import ProductosModule from './components/modules/ProductosModule';
 import FactoryManagement from './components/modules/FactoryManagement';
-import PresupuestoModule from './components/modules/PresupuestoModule';
+import QuotationManagement from './components/modules/QuotationManagement';
 import UserManagement from './components/modules/UserManagement';
 import ProveedoresModule from './components/modules/ProveedoresModule';
 import VentasModule from './components/modules/VentasModule';
@@ -128,7 +128,7 @@ function MainApp() {
             <Route path="/ventas" element={<PrivateRoute><VentasModule /></PrivateRoute>} />
             <Route path="/contable-finanzas" element={<PrivateRoute><FinanzasModule /></PrivateRoute>} />
             <Route path="/recursos-humanos" element={<PrivateRoute><RRHHModule /></PrivateRoute>} />
-            <Route path="/presupuestos" element={<PrivateRoute><PresupuestoModule /></PrivateRoute>} />
+            <Route path="/presupuestos" element={<PrivateRoute><QuotationManagement /></PrivateRoute>} />
             <Route path="/administracion" element={<PrivateRoute><AdministrationModule /></PrivateRoute>} />
             
             <Route path="/clientes" element={<PrivateRoute><ClientesModule /></PrivateRoute>} />

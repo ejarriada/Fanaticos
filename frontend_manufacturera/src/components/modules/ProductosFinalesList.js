@@ -161,8 +161,8 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                 weight: product.weight || '',
                 waste: product.waste || '',
                 is_manufactured: product.is_manufactured || false,
-                design: product.design || '', // Populate design ID
-                colors: product.colors ? product.colors.map(c => c.id) : [], // Populate color IDs
+                design: product.design?.id || '', // ← CORREGIDO: Obtener el ID del objeto design
+                colors: product.colors ? product.colors.map(c => c.id) : [],
             });
             setProductFiles(product.product_files || []);
         } else {
@@ -180,7 +180,7 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                 design: '',
                 colors: [],
             });
-            setAvailableSizes([]); // Clear available sizes for new product
+            setAvailableSizes([]);
             setProductFiles([]);
         }
     }, [product, open]);
@@ -224,12 +224,23 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
         submissionData.append('weight', formData.weight);
         submissionData.append('waste', formData.waste);
         submissionData.append('is_manufactured', formData.is_manufactured);
-        submissionData.append('design', formData.design || '');
+        if (formData.design) {
+            submissionData.append('design', formData.design);
+        }
         formData.colors.forEach(id => submissionData.append('color_ids', id));
 
         productFiles.forEach(file => {
             submissionData.append('product_files', file);
         });
+
+        console.log('=== DEBUG GUARDAR PRODUCTO ===');
+        console.log('formData.design:', formData.design);
+        console.log('FormData entries:');
+        for (let pair of submissionData.entries()) {
+            console.log(pair[0] + ': ' + pair[1]);
+        }
+        console.log('==============================');
+
 
         onSave(submissionData);
     };
@@ -267,32 +278,25 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                     {availableSizes.length > 0 ? availableSizes.map(size => size.name).join(', ') : ''}
                 </Typography>
                 <FormControl fullWidth margin="dense">
-                    <InputLabel id="colors-multiple-chip-label">Colores</InputLabel>
+                    <InputLabel>Plantilla de Producto</InputLabel>
                     <Select
-                        labelId="colors-multiple-chip-label"
-                        multiple
-                        name="colors"
-                        value={formData.colors}
-                        onChange={handleMultiSelectChange}
-                        input={<OutlinedInput id="select-multiple-chip" label="Colores" />}
-                        renderValue={(selected) => (
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                {selected.map((value) => (
-                                    <Chip key={value} label={availableColors.find(c => c.id === value)?.name || value} />
-                                ))}
-                            </Box>
-                        )}
+                        name="design"
+                        value={formData.design || ''}
+                        onChange={handleChange}
+                        label="Plantilla de Producto"
+                        disabled={!!product} // ← Deshabilitar si estamos editando
                     >
-                        {availableColors.map((color) => (
-                            <MenuItem
-                                key={color.id}
-                                value={color.id}
-                            >
-                                {color.name}
-                            </MenuItem>
+                        <MenuItem value=""><em>Ninguna</em></MenuItem>
+                        {designs.map((design) => (
+                            <MenuItem key={design.id} value={design.id}>{design.name}</MenuItem>
                         ))}
                     </Select>
                 </FormControl>
+                {product && formData.design && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                        La plantilla no puede modificarse una vez creado el producto
+                    </Typography>
+                )}
                 <Button onClick={() => handleOpenColorForm()} sx={{ mt: 1, mb: 2 }}>
                     Nuevo Color
                 </Button>

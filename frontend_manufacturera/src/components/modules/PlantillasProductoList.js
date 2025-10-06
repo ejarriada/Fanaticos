@@ -30,6 +30,42 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
     const [isSizeFormOpen, setIsSizeFormOpen] = useState(false);
     const [selectedSize, setSelectedSize] = useState(null);
 
+    // Función para ordenar talles
+    const sortSizes = (sizesArray) => {
+        return [...sizesArray].sort((a, b) => {
+            const aName = a.name.toUpperCase();
+            const bName = b.name.toUpperCase();
+            
+            // Si ambos son numéricos, ordenar numéricamente
+            const aIsNumeric = /^\d+$/.test(aName);
+            const bIsNumeric = /^\d+$/.test(bName);
+            
+            if (aIsNumeric && bIsNumeric) {
+                return parseInt(aName) - parseInt(bName);
+            }
+            
+            // Los numéricos van primero
+            if (aIsNumeric) return -1;
+            if (bIsNumeric) return 1;
+            
+            // Para alfanuméricos, orden específico
+            const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+            const aIndex = sizeOrder.indexOf(aName);
+            const bIndex = sizeOrder.indexOf(bName);
+            
+            if (aIndex !== -1 && bIndex !== -1) {
+                return aIndex - bIndex;
+            }
+            
+            // Si uno está en el orden y otro no
+            if (aIndex !== -1) return -1;
+            if (bIndex !== -1) return 1;
+            
+            // Fallback: orden alfabético
+            return aName.localeCompare(bName);
+        });
+    };
+
     const handleOpenCategoryForm = (category = null) => {
         setSelectedCategory(category);
         setIsCategoryFormOpen(true);
@@ -95,7 +131,9 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
             }
             handleCloseSizeForm();
             const sizesData = await api.list('/sizes/');
-            setSizes(Array.isArray(sizesData) ? sizesData : sizesData.results || []);
+            const sizesArray = Array.isArray(sizesData) ? sizesData : sizesData.results || [];
+            const sortedSizes = sortSizes(sizesArray);
+            setSizes(sortedSizes);
         } catch (err) {
             console.error('Error al guardar la talla:', err);
         }
@@ -123,9 +161,9 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                 
                 setProcesses(Array.isArray(processesData) ? processesData : processesData.results || []);
                 setCategories(Array.isArray(categoriesData) ? categoriesData : categoriesData.results || []);
-                console.log('Fetched categoriesData:', categoriesData);
-                console.log('Categories state after setting:', (Array.isArray(categoriesData) ? categoriesData : categoriesData.results || []));
-                setSizes(Array.isArray(sizesData) ? sizesData : sizesData.results || []);
+                const sizesArray = Array.isArray(sizesData) ? sizesData : sizesData.results || [];
+                const sortedSizes = sortSizes(sizesArray);
+                setSizes(sortedSizes);
             } catch (err) {
                 setDependenciesError('Error al cargar dependencias (materias primas, procesos, categorías, tallas).');
                 console.error(err);
@@ -197,12 +235,15 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
         });
     };
 
+    // ✅ FUNCIÓN CORREGIDA CON SINCRONIZACIÓN
     const handleRecipeChange = (type, index, field, value) => {
         const newItems = [...formData[type]];
         newItems[index][field] = value;
  
         if (type === 'materials') {
             const material = newItems[index];
+            
+            // Calcular costo cuando cambia materia prima o cantidad
             if (field === 'raw_material' || field === 'quantity') {
                 const selectedRawMaterial = rawMaterials.find(rm => rm.id === material.raw_material);
                 
@@ -229,6 +270,27 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                     newItems[index].raw_material_cost = '0.00';
                 }
             }
+            
+            // ✅ NUEVO: Cuando se selecciona un proceso en un material, agregarlo a la secuencia si no existe
+            if (field === 'process' && value) {
+                const processExists = formData.processes.some(p => p.process === value);
+                if (!processExists) {
+                    const selectedProcess = processes.find(p => p.id === value);
+                    if (selectedProcess) {
+                        const newProcess = {
+                            process: value,
+                            order: formData.processes.length + 1,
+                            process_cost: selectedProcess.cost
+                        };
+                        setFormData(prev => ({
+                            ...prev,
+                            materials: newItems,
+                            processes: [...prev.processes, newProcess]
+                        }));
+                        return;
+                    }
+                }
+            }
         } else if (type === 'processes') {
             if (field === 'process') {
                 const selectedProcess = processes.find(p => p.id === value);
@@ -248,9 +310,28 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
         setFormData(prev => ({ ...prev, [type]: [...prev[type], newItem] }));
     };
 
+    // ✅ FUNCIÓN CORREGIDA CON SINCRONIZACIÓN
     const removeRecipeItem = (type, index) => {
-        const newItems = formData[type].filter((_, i) => i !== index);
-        setFormData(prev => ({ ...prev, [type]: newItems }));
+        if (type === 'processes') {
+            // Si se elimina un proceso, quitarlo también de los materiales que lo usan
+            const processToRemove = formData.processes[index].process;
+            const updatedMaterials = formData.materials.map(material => {
+                if (material.process === processToRemove) {
+                    return { ...material, process: '' };
+                }
+                return material;
+            });
+            
+            const newProcesses = formData.processes.filter((_, i) => i !== index);
+            setFormData(prev => ({ 
+                ...prev, 
+                processes: newProcesses,
+                materials: updatedMaterials
+            }));
+        } else {
+            const newItems = formData[type].filter((_, i) => i !== index);
+            setFormData(prev => ({ ...prev, [type]: newItems }));
+        }
     };
 
     const handleSubmit = () => {
@@ -472,10 +553,9 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                                     <InputLabel>Proceso</InputLabel>
                                     <Select value={material.process || ''} onChange={(e) => handleRecipeChange('materials', index, 'process', e.target.value)}>
                                         <MenuItem value=""><em>Ninguno</em></MenuItem>
-                                        {formData.processes.map(p => {
-                                            const process = processes.find(proc => proc.id === p.process);
-                                            return process ? <MenuItem key={process.id} value={process.id}>{process.name}</MenuItem> : null;
-                                        })}
+                                        {processes.map(p => (
+                                            <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+                                        ))}
                                     </Select>
                                 </FormControl>
                             </Grid>
@@ -494,6 +574,9 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                 <Button startIcon={<AddIcon />} onClick={() => addRecipeItem('materials')} sx={{ mt: 1 }}>Añadir Materia Prima</Button>
 
                 <Typography sx={{ mt: 3, mb: 1 }}>Secuencia de Procesos</Typography>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                    Los procesos se agregan automáticamente al seleccionarlos en los materiales. Puedes ajustar el orden y costo aquí.
+                </Alert>
                 <Stack spacing={2}>
                     {formData.processes.map((proc, index) => (
                         <Grid container spacing={2} key={index} alignItems="center">

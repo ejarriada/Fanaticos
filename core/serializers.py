@@ -82,6 +82,55 @@ class DesignSerializer(TenantAwareSerializer):
         model = Design
         fields = ['id', 'name', 'product_code', 'description', 'materials', 'processes', 'design_files', 'category', 'category_id', 'sizes', 'size_ids', 'calculated_cost']
 
+    def create(self, validated_data):
+        materials_data = validated_data.pop('designmaterial_set', [])
+        processes_data = validated_data.pop('designprocess_set', [])
+        sizes_data = validated_data.pop('sizes', [])
+        
+        with transaction.atomic():
+            design = Design.objects.create(**validated_data)
+            design.sizes.set(sizes_data)
+
+            for material_data in materials_data:
+                DesignMaterial.objects.create(design=design, tenant=design.tenant, **material_data)
+            
+            for process_data in processes_data:
+                DesignProcess.objects.create(design=design, tenant=design.tenant, **process_data)
+            
+            design.calculate_cost()
+
+        return design
+
+    def update(self, instance, validated_data):
+        materials_data = validated_data.pop('designmaterial_set', None)
+        processes_data = validated_data.pop('designprocess_set', None)
+        sizes_data = validated_data.pop('sizes', None)
+
+        with transaction.atomic():
+            # Update scalar fields of the Design instance
+            instance.name = validated_data.get('name', instance.name)
+            instance.product_code = validated_data.get('product_code', instance.product_code)
+            instance.description = validated_data.get('description', instance.description)
+            instance.category = validated_data.get('category', instance.category)
+            instance.save()
+
+            if sizes_data is not None:
+                instance.sizes.set(sizes_data)
+
+            if materials_data is not None:
+                instance.designmaterial_set.all().delete()
+                for material_data in materials_data:
+                    DesignMaterial.objects.create(design=instance, tenant=instance.tenant, **material_data)
+
+            if processes_data is not None:
+                instance.designprocess_set.all().delete()
+                for process_data in processes_data:
+                    DesignProcess.objects.create(design=instance, tenant=instance.tenant, **process_data)
+            
+            instance.calculate_cost()
+
+        return instance
+
 # --- User and Client Serializers ---
 
 class SystemRoleSerializer(TenantAwareSerializer):
@@ -115,9 +164,42 @@ class ContactSerializer(TenantAwareSerializer):
 
 class ClientSerializer(TenantAwareSerializer):
     contacts = ContactSerializer(many=True, required=False)
+
     class Meta(TenantAwareSerializer.Meta):
         model = Client
         fields = ['id', 'name', 'cuit', 'email', 'phone', 'address', 'city', 'province', 'iva_condition', 'details', 'contacts']
+
+    def create(self, validated_data):
+        contacts_data = validated_data.pop('contacts', [])
+        with transaction.atomic():
+            client = Client.objects.create(**validated_data)
+            for contact_data in contacts_data:
+                Contact.objects.create(client=client, tenant=client.tenant, **contact_data)
+        return client
+
+    def update(self, instance, validated_data):
+        contacts_data = validated_data.pop('contacts', None)
+
+        # Update scalar fields of the Client instance
+        instance.name = validated_data.get('name', instance.name)
+        instance.cuit = validated_data.get('cuit', instance.cuit)
+        instance.email = validated_data.get('email', instance.email)
+        instance.phone = validated_data.get('phone', instance.phone)
+        instance.address = validated_data.get('address', instance.address)
+        instance.city = validated_data.get('city', instance.city)
+        instance.province = validated_data.get('province', instance.province)
+        instance.iva_condition = validated_data.get('iva_condition', instance.iva_condition)
+        instance.details = validated_data.get('details', instance.details)
+        instance.save()
+
+        # Handle nested contacts if provided
+        if contacts_data is not None:
+            with transaction.atomic():
+                instance.contacts.all().delete()
+                for contact_data in contacts_data:
+                    Contact.objects.create(client=instance, tenant=instance.tenant, **contact_data)
+
+        return instance
 
 # --- Commercial Flow Serializers (Quotation, Sale) ---
 
@@ -298,14 +380,77 @@ class WarehouseSerializer(serializers.ModelSerializer):
 class ProductSerializer(TenantAwareSerializer):
     cost = serializers.SerializerMethodField()
     design = DesignSerializer(read_only=True)
+    size = SizeSerializer(read_only=True)
+    colors = ColorSerializer(many=True, read_only=True)
+
+    design_id = serializers.PrimaryKeyRelatedField(
+        queryset=Design.objects.all(), source='design', write_only=True, allow_null=True, required=False
+    )
+    size_id = serializers.PrimaryKeyRelatedField(
+        queryset=Size.objects.all(), source='size', write_only=True, allow_null=True, required=False
+    )
+    color_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Color.objects.all(), source='colors', many=True, write_only=True, required=False
+    )
 
     class Meta(TenantAwareSerializer.Meta):
         model = Product
-        fields = ['id', 'name', 'description', 'design', 'size', 'colors', 'sku', 'factory_price', 'club_price', 'suggested_final_price', 'weight', 'waste', 'is_manufactured', 'cost']
+        fields = [
+            'id', 'name', 'description', 'design', 'size', 'colors', 'sku', 
+            'factory_price', 'club_price', 'suggested_final_price', 'weight', 'waste', 
+            'is_manufactured', 'cost', 'design_id', 'size_id', 'color_ids'
+        ]
+    
     def get_cost(self, obj):
         if obj.design:
             return obj.design.calculated_cost
         return 0.00
+
+    def create(self, validated_data):
+        colors_data = validated_data.pop('colors', [])
+        
+        # --- Unique SKU Generation ---
+        if 'sku' not in validated_data or not validated_data['sku']:
+            name = validated_data.get('name', 'prod')
+            timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+            base_sku = f"SKU-{name[:3].upper()}-{timestamp}"
+            sku = base_sku
+            counter = 1
+            while Product.objects.filter(sku=sku).exists():
+                sku = f"{base_sku}-{counter}"
+                counter += 1
+            validated_data['sku'] = sku
+        # --- End of SKU Generation ---
+
+        product = Product.objects.create(**validated_data)
+        product.colors.set(colors_data)
+        return product
+
+    def update(self, instance, validated_data):
+        colors_data = validated_data.pop('colors', None)
+
+        # Update scalar fields
+        instance.name = validated_data.get('name', instance.name)
+        instance.description = validated_data.get('description', instance.description)
+        instance.sku = validated_data.get('sku', instance.sku)
+        instance.factory_price = validated_data.get('factory_price', instance.factory_price)
+        instance.club_price = validated_data.get('club_price', instance.club_price)
+        instance.suggested_final_price = validated_data.get('suggested_final_price', instance.suggested_final_price)
+        instance.weight = validated_data.get('weight', instance.weight)
+        instance.waste = validated_data.get('waste', instance.waste)
+        instance.is_manufactured = validated_data.get('is_manufactured', instance.is_manufactured)
+        
+        # Update foreign key fields
+        instance.design = validated_data.get('design', instance.design)
+        instance.size = validated_data.get('size', instance.size)
+        
+        instance.save()
+
+        # Update many-to-many field
+        if colors_data is not None:
+            instance.colors.set(colors_data)
+
+        return instance
 
 class DeliveryNoteItemSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):

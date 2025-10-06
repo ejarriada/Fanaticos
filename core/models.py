@@ -133,7 +133,7 @@ class DesignMaterial(TenantAwareModel):
     design = models.ForeignKey(Design, on_delete=models.CASCADE)
     raw_material = models.ForeignKey(RawMaterial, on_delete=models.CASCADE)
     process = models.ForeignKey(DesignProcess, on_delete=models.SET_NULL, null=True, blank=True, related_name='materials', help_text="Proceso en el que se consume este material.")
-    quantity = models.DecimalField(max_digits=10, decimal_places=2, help_text="Cantidad de materia prima necesaria para el diseño.")
+    quantity = models.DecimalField(max_digits=10, decimal_places=4, help_text="Cantidad de materia prima necesaria para el diseño.")
     cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Costo unitario de la materia prima en el momento del diseño.") # NEW FIELD
 
     class Meta:

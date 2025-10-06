@@ -70,7 +70,43 @@ class TenantAwareViewSet(viewsets.ModelViewSet):
         serializer.save(tenant=tenant)
 
 # Tenant-aware ViewSets
-class ProductViewSet(TenantAwareViewSet): queryset = Product.objects.all(); serializer_class = ProductSerializer
+class ProductViewSet(TenantAwareViewSet):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    
+    def perform_create(self, serializer):
+        tenant = self.get_tenant()
+        
+        # Obtener design_id y color_ids del request
+        design_id = self.request.data.get('design')
+        color_ids = self.request.data.getlist('color_ids')
+        
+        # Guardar el producto
+        product = serializer.save(tenant=tenant)
+        
+        # Asociar el diseño si existe
+        if design_id:
+            try:
+                design = Design.objects.get(id=design_id, tenant=tenant)
+                product.design = design
+                product.save()
+            except Design.DoesNotExist:
+                pass
+        
+        # Asociar los colores
+        if color_ids:
+            product.colors.set(color_ids)
+    
+    def perform_update(self, serializer):
+        # Obtener color_ids del request (design no se modifica en edición)
+        color_ids = self.request.data.getlist('color_ids')
+        
+        # Actualizar el producto
+        product = serializer.save()
+        
+        # Actualizar los colores
+        if color_ids:
+            product.colors.set(color_ids)
 
 class ProductFileViewSet(TenantAwareViewSet):
     queryset = ProductFile.objects.all()
