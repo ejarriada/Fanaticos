@@ -397,10 +397,49 @@ class SaleViewSet(TenantAwareViewSet):
         if end_date:
             queryset = queryset.filter(sale_date__date__lte=end_date)
             
-        return queryset
-
     def perform_create(self, serializer):
-        serializer.save(tenant=self.get_tenant(), user=self.request.user)
+        # Métodos de pago que se consideran al contado y deben generar un pago inmediato.
+        IMMEDIATE_PAYMENT_METHODS = ['Efectivo', 'Transferencia', 'Mercado Pago']
+
+        tenant = self.get_tenant()
+        
+        # Usar una transacción atómica para asegurar la integridad de los datos.
+        # O se crea la venta y el pago, o no se crea nada.
+        with transaction.atomic():
+            # Guardar la venta principal
+            sale = serializer.save(tenant=tenant, user=self.request.user)
+
+            # Verificar si el método de pago requiere un registro de pago inmediato.
+            if sale.payment_method in IMMEDIATE_PAYMENT_METHODS:
+                # Buscar la cuenta de 'Caja' o una cuenta de activo para registrar el ingreso.
+                # Esto asume que existe una cuenta apropiada.
+                cash_account = Account.objects.filter(
+                    tenant=tenant,
+                    account_type='Activo',
+                    name__icontains='Caja'
+                ).first()
+
+                # Si no se encuentra una cuenta de caja, se busca la primera cuenta de activo como fallback.
+                if not cash_account:
+                    cash_account = Account.objects.filter(
+                        tenant=tenant,
+                        account_type='Activo'
+                    ).first()
+                
+                # Si, y solo si, se encuentra una cuenta donde registrar el pago, se crea la transacción.
+                if cash_account:
+                    Transaction.objects.create(
+                        tenant=tenant,
+                        account=cash_account,
+                        amount=sale.total_amount,  # Monto positivo, es un ingreso/pago.
+                        description=f"Pago automático por Venta #{sale.id} ({sale.payment_method})",
+                        related_sale=sale,
+                        date=sale.sale_date
+                    )
+                # Nota: Si no existe una cuenta de 'Activo', la transacción de pago no se creará,
+                # y el problema de balance negativo persistiría en ese caso excepcional.
+                # Se asume que la configuración del sistema incluye al menos una cuenta de activo.
+
 
 class InventoryViewSet(TenantAwareViewSet):
     queryset = Inventory.objects.all()
