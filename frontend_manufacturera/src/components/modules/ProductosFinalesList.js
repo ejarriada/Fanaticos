@@ -233,15 +233,6 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
             submissionData.append('product_files', file);
         });
 
-        console.log('=== DEBUG GUARDAR PRODUCTO ===');
-        console.log('formData.design:', formData.design);
-        console.log('FormData entries:');
-        for (let pair of submissionData.entries()) {
-            console.log(pair[0] + ': ' + pair[1]);
-        }
-        console.log('==============================');
-
-
         onSave(submissionData);
     };
 

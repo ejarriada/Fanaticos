@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, TextField, IconButton, CircularProgress, Alert } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
@@ -56,12 +55,6 @@ const SalesList = () => {
                 console.error(err);
             }
         }
-    };
-
-    const handleEdit = (sale) => {
-        // For now, just log the sale to the console
-        console.log('Editando venta:', sale);
-        // We can implement a dialog or a separate page for editing later
     };
 
     return (
@@ -119,7 +112,6 @@ const SalesList = () => {
                                     <TableCell>{sale.total_amount}</TableCell>
                                     <TableCell>{sale.sale_date}</TableCell>
                                     <TableCell>
-                                        <IconButton onClick={() => handleEdit(sale)}><EditIcon /></IconButton>
                                         <IconButton onClick={() => handleDelete(sale.id)}><DeleteIcon /></IconButton>
                                     </TableCell>
                                 </TableRow>

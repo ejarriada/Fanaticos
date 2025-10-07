@@ -141,9 +141,7 @@ const ClientList = () => {
         try {
             setLoading(true);
             const data = await api.list('/clients/');
-            console.log('Data from API:', data);
             const clientList = Array.isArray(data) ? data : data.results;
-            console.log('ClientList after processing:', clientList);
 
             const clientsWithBalance = await Promise.all(clientList.map(async (client) => {
                 try {
@@ -155,7 +153,6 @@ const ClientList = () => {
                 }
             }));
 
-            console.log('Clients with balance:', clientsWithBalance);
             setClients(clientsWithBalance || []);
             setError(null);
         } catch (err) {
@@ -192,7 +189,6 @@ const ClientList = () => {
             fetchClients(); // Refresh list
             handleCloseForm();
         } catch (err) {
-            console.log("Detailed error response:", err.response?.data);
             const errorData = err.response?.data;
             const errorMessage = errorData 
                 ? Object.entries(errorData).map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`).join('; ')

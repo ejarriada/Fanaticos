@@ -280,6 +280,7 @@ class OrderNoteSerializer(TenantAwareSerializer):
         queryset=Sale.objects.filter(order_note__isnull=True), 
         source='sale', 
         write_only=True,
+        required=False,
         help_text="ID de la Venta para la cual se crea la Nota de Pedido. La venta no debe tener ya una nota de pedido asociada."
     )
 

@@ -156,9 +156,6 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                 const materialsWithCost = Array.isArray(rawMaterialsProveedorData) ? rawMaterialsProveedorData : rawMaterialsProveedorData.results || [];
                 setRawMaterialsWithCost(materialsWithCost);
                 
-                console.log('Fetched rawMaterialsData:', rawMaterialsData);
-                console.log('Fetched rawMaterialsProveedorData with costs:', materialsWithCost);
-                
                 setProcesses(Array.isArray(processesData) ? processesData : processesData.results || []);
                 setCategories(Array.isArray(categoriesData) ? categoriesData : categoriesData.results || []);
                 const sizesArray = Array.isArray(sizesData) ? sizesData : sizesData.results || [];
@@ -256,15 +253,13 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                     
                     if (materialsFromProviders.length > 0) {
                         highestCost = Math.max(...materialsFromProviders.map(mp => parseFloat(mp.cost || 0)));
-                        console.log(`Material: ${selectedRawMaterial.name}, Highest Cost: ${highestCost}, Quantity: ${material.quantity}`);
                     } else {
                         console.warn(`No se encontraron costos para la materia prima: ${selectedRawMaterial.name}`);
                     }
 
                     newItems[index].unit_cost = highestCost;
                     newItems[index].raw_material_cost = (highestCost * parseFloat(material.quantity)).toFixed(2);
-                    
-                    console.log(`Calculated cost for ${selectedRawMaterial.name}: ${newItems[index].raw_material_cost}`);
+
                 } else {
                     newItems[index].unit_cost = 0;
                     newItems[index].raw_material_cost = '0.00';

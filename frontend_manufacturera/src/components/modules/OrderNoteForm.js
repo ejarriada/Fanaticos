@@ -21,7 +21,7 @@ const OrderNoteForm = ({ open, onClose, onSave, orderNote }) => {
             if (open) {
                 try {
                     // Fetch sales available for new order notes
-                    const data = await api.list('/sales/available-for-order-note/');
+                    const data = await api.list('/sales/');
                     let availableSales = data.results || data || [];
 
                     // If we are editing an existing order note
@@ -55,6 +55,7 @@ const OrderNoteForm = ({ open, onClose, onSave, orderNote }) => {
             }
         };
         fetchAndSetData();
+        
     }, [open, orderNote]);
 
     const handleChange = (e) => {
@@ -68,9 +69,16 @@ const OrderNoteForm = ({ open, onClose, onSave, orderNote }) => {
 
     const handleSubmit = () => {
         const payload = {
-            ...formData,
-            sale_id: formData.sale
+            estimated_delivery_date: formData.estimated_delivery_date,
+            shipping_method: formData.shipping_method,
+            details: formData.details
         };
+
+        // Solo incluir sale_id si estamos CREANDO (no editando)
+        if (!orderNote) {
+            payload.sale_id = formData.sale;
+        }
+
         delete payload.sale;
         onSave(payload);
     };
@@ -111,7 +119,7 @@ const OrderNoteForm = ({ open, onClose, onSave, orderNote }) => {
                                             <Typography><b>Cliente:</b> {selectedSale.client.name}</Typography>
                                             <Typography><b>Vendedor:</b> {selectedSale.user?.first_name || 'N/A'}</Typography>
                                             <Typography><b>Monto Total:</b> ${selectedSale.total_amount}</Typography>
-                                            <Typography><b>Estado del Pago:</b> {selectedSale.payment_status}</Typography>
+                                            <Typography><b>Método de Pago:</b> {selectedSale.payment_method_name || selectedSale.payment_status || 'N/A'}</Typography>
                                         </Grid>
                                         <Grid xs={6}>
                                             <Typography><b>Contacto:</b> {mainContact?.name || 'No disponible'}</Typography>

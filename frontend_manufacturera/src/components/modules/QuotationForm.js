@@ -87,14 +87,6 @@ const QuotationForm = ({ open, onClose, onSave, quotation }) => {
         const selectedProduct = products.find(p => p.id === newItem.product);
         if (!selectedProduct) return;
 
-         // DEBUG: Ver qué tiene el producto
-        console.log('=== DEBUG PRODUCTO SELECCIONADO ===');
-        console.log('Producto completo:', selectedProduct);
-        console.log('selectedProduct.cost:', selectedProduct.cost);
-        console.log('selectedProduct.design:', selectedProduct.design);
-        console.log('selectedProduct.design?.calculated_cost:', selectedProduct.design?.calculated_cost);
-        console.log('===================================');
-
         const itemToAdd = {
             product: selectedProduct.id,
             quantity: newItem.quantity,

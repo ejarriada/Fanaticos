@@ -169,24 +169,18 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
     const handleSave = () => {
         const data = new FormData();
         
-        // Debug: Mostrar los datos que se envían
-        console.log('Datos que se envían al backend (Medias):');
-        
         // Append main fields
         Object.keys(formData).forEach(key => {
             if (key === 'items' || key === 'colors' || key === 'specifications') {
                 data.append(key, JSON.stringify(formData[key]));
-                console.log(key, ':', JSON.stringify(formData[key]));
             } else if (formData[key] !== null && formData[key] !== undefined && formData[key] !== '') {
                 data.append(key, formData[key]);
-                console.log(key, ':', formData[key]);
             }
         });
 
         // Append files
         productFiles.forEach((file, index) => {
             data.append('product_files', file);
-            console.log(`product_files[${index}]:`, file.name);
         });
 
         onSave(data);

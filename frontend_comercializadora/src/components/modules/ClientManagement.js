@@ -103,7 +103,6 @@ const ClientManagement = () => {
             fetchClients(); // Refresh list
             handleCloseForm();
         } catch (err) {
-            console.log("Detailed error response:", err.response?.data);
             const errorData = err.response?.data;
             const errorMessage = errorData 
                 ? Object.entries(errorData).map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`).join('; ')

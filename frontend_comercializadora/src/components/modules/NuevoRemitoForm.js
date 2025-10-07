@@ -18,8 +18,6 @@ const NuevoRemitoForm = ({ open, onClose }) => {
   };
 
   const handleSubmit = () => {
-    // Logic to submit remitoData
-    console.log('Remito Data:', remitoData);
     // Example: api.post('/remitos', remitoData);
     onClose();
   };

@@ -142,8 +142,6 @@ const ProductionTracking = () => {
                 )
             );
         }
-        
-        console.log(`Proceso ${processName}: ${action}`);
     };
 
     const handleFileView = (file) => {

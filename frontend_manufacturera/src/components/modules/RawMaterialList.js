@@ -254,7 +254,6 @@ const RawMaterialList = () => {
         try {
             setLoading(true);
             const data = await api.list('/materia-prima-proveedores/');
-            console.log("fetchRawMaterials: Data received from API:", data);
             const processedData = data.results || (Array.isArray(data) ? data : []);
             setRawMaterials(processedData);
             setError(null);

@@ -396,6 +396,8 @@ class SaleViewSet(TenantAwareViewSet):
             queryset = queryset.filter(sale_date__date__gte=start_date)
         if end_date:
             queryset = queryset.filter(sale_date__date__lte=end_date)
+
+        return queryset
             
     def perform_create(self, serializer):
         # Métodos de pago que se consideran al contado y deben generar un pago inmediato.
