@@ -147,7 +147,7 @@ const SalesList = () => {
                                     <TableCell>{sale.id}</TableCell>
                                     <TableCell>
                                         {sale.items && sale.items.length > 0 
-                                            ? sale.items.map(item => item.product_name).join(', ') 
+                                            ? sale.items.map(item => item.product?.name).join(', ') 
                                             : 'N/A'}
                                     </TableCell>
                                     <TableCell>{sale.client?.name || 'N/A'}</TableCell>

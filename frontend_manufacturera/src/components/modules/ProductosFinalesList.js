@@ -225,7 +225,7 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
         submissionData.append('waste', formData.waste);
         submissionData.append('is_manufactured', formData.is_manufactured);
         if (formData.design) {
-            submissionData.append('design', formData.design);
+            submissionData.append('design_id', formData.design);
         }
         formData.colors.forEach(id => submissionData.append('color_ids', id));
 
@@ -277,21 +277,7 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
                 <Typography variant="body2" sx={{ mb: 2 }}>
                     {availableSizes.length > 0 ? availableSizes.map(size => size.name).join(', ') : ''}
                 </Typography>
-                <FormControl fullWidth margin="dense">
-                    <InputLabel>Plantilla de Producto</InputLabel>
-                    <Select
-                        name="design"
-                        value={formData.design || ''}
-                        onChange={handleChange}
-                        label="Plantilla de Producto"
-                        disabled={!!product} // ← Deshabilitar si estamos editando
-                    >
-                        <MenuItem value=""><em>Ninguna</em></MenuItem>
-                        {designs.map((design) => (
-                            <MenuItem key={design.id} value={design.id}>{design.name}</MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
+
                 {product && formData.design && (
                     <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
                         La plantilla no puede modificarse una vez creado el producto

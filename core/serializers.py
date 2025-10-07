@@ -352,12 +352,21 @@ class SaleSerializer(TenantAwareSerializer):
         queryset=Client.objects.all(), source='client', write_only=True
     )
     related_quotation = QuotationSerializer(read_only=True)
-    user = UserSerializer(read_only=True) 
+    user = UserSerializer(read_only=True)
+    payment_method_name = serializers.SerializerMethodField()
 
     class Meta(TenantAwareSerializer.Meta):
         model = Sale
-        fields = ['id', 'client', 'client_id', 'sale_date', 'local', 'total_amount', 'payment_method', 'related_quotation', 'items', 'user']
+        fields = ['id', 'client', 'client_id', 'sale_date', 'local', 'total_amount', 'payment_method', 'payment_method_name', 'related_quotation', 'items', 'user']
         read_only_fields = ('tenant', 'sale_date')
+
+    def get_payment_method_name(self, obj):
+        try:
+            pm_id = int(obj.payment_method)
+            pm_type = PaymentMethodType.objects.get(pk=pm_id)
+            return pm_type.name
+        except (ValueError, TypeError, PaymentMethodType.DoesNotExist):
+            return obj.payment_method or 'N/A'
 
     def create(self, validated_data):
         items_data = validated_data.pop('items')
@@ -408,8 +417,9 @@ class ProductSerializer(TenantAwareSerializer):
 
     def create(self, validated_data):
         colors_data = validated_data.pop('colors', [])
-        
-        # --- Unique SKU Generation ---
+        design = validated_data.pop('design', None)
+        size = validated_data.pop('size', None)
+
         if 'sku' not in validated_data or not validated_data['sku']:
             name = validated_data.get('name', 'prod')
             timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
@@ -420,9 +430,8 @@ class ProductSerializer(TenantAwareSerializer):
                 sku = f"{base_sku}-{counter}"
                 counter += 1
             validated_data['sku'] = sku
-        # --- End of SKU Generation ---
 
-        product = Product.objects.create(**validated_data)
+        product = Product.objects.create(design=design, size=size, **validated_data)
         product.colors.set(colors_data)
         return product
 

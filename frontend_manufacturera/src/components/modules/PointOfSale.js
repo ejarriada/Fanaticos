@@ -258,7 +258,7 @@ const PointOfSale = () => {
                 local: null,
                 caja_id: newSale.caja_id,
                 items: newSale.saleItems.map(item => ({
-                    product: item.product_id,
+                    product_id: item.product_id,
                     quantity: item.quantity,
                     unit_price: item.price,
                 })),

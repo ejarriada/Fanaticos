@@ -23,6 +23,7 @@ const QuotationForm = ({ open, onClose, onSave, quotation }) => {
 
     // Estado para agregar nuevo producto
     const [newItem, setNewItem] = useState({ product: '', quantity: 1 });
+    const [priceType, setPriceType] = useState('club_price');
 
     useEffect(() => {
         const fetchDependencies = async () => {
@@ -97,7 +98,7 @@ const QuotationForm = ({ open, onClose, onSave, quotation }) => {
         const itemToAdd = {
             product: selectedProduct.id,
             quantity: newItem.quantity,
-            unit_price: selectedProduct.club_price || '0.00',
+            unit_price: selectedProduct[priceType] || '0.00',
             cost: selectedProduct.cost || '0.00'
         };
 
@@ -218,6 +219,18 @@ const QuotationForm = ({ open, onClose, onSave, quotation }) => {
                                     {p.name}
                                 </MenuItem>
                             ))}
+                        </Select>
+                    </FormControl>
+
+                    <FormControl sx={{ flex: '0 1 180px' }}>
+                        <InputLabel>Tipo de Precio</InputLabel>
+                        <Select
+                            value={priceType}
+                            onChange={(e) => setPriceType(e.target.value)}
+                            label="Tipo de Precio"
+                        >
+                            <MenuItem value="club_price">Precio Club</MenuItem>
+                            <MenuItem value="factory_price">Precio Fábrica</MenuItem>
                         </Select>
                     </FormControl>
                     

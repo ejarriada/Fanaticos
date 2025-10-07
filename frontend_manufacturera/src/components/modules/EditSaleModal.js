@@ -87,13 +87,7 @@ const EditSaleModal = ({ open, onClose, sale, onSave }) => {
                         InputLabelProps={{ shrink: true }}
                         sx={{ mt: 2 }}
                     />
-                    <TextField
-                        label="Método de Pago"
-                        fullWidth
-                        value={formData.payment_method || ''}
-                        onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                        sx={{ mt: 2 }}
-                    />
+                    <Typography sx={{ mt: 2 }}><strong>Método de Pago:</strong> {sale?.payment_method_name || 'N/A'}</Typography>
                 </Box>
 
                 <Box sx={{ mb: 3 }}>
@@ -117,7 +111,7 @@ const EditSaleModal = ({ open, onClose, sale, onSave }) => {
                                     const subtotal = item.quantity * parseFloat(item.unit_price);
                                     return (
                                         <TableRow key={index}>
-                                            <TableCell>{item.product_name || 'N/A'}</TableCell>
+                                            <TableCell>{item.product?.name || 'N/A'}</TableCell>
                                             <TableCell align="center">
                                                 <TextField
                                                     type="number"

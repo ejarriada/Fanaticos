@@ -22,7 +22,7 @@ const SaleDetailsModal = ({ open, onClose, sale }) => {
                     <Typography><strong>Cliente:</strong> {sale.client?.name || 'N/A'}</Typography>
                     <Typography><strong>Fecha:</strong> {new Date(sale.sale_date).toLocaleDateString()}</Typography>
                     <Typography><strong>Usuario:</strong> {sale.user?.email || 'N/A'}</Typography>
-                    <Typography><strong>Método de Pago:</strong> {sale.payment_method || 'N/A'}</Typography>
+                    <Typography><strong>Método de Pago:</strong> {sale.payment_method_name || 'N/A'}</Typography>
                     <Typography><strong>Estado:</strong> {sale.status || 'Completada'}</Typography>
                 </Box>
 
@@ -44,7 +44,7 @@ const SaleDetailsModal = ({ open, onClose, sale }) => {
                             <TableBody>
                                 {sale.items?.map((item, index) => (
                                     <TableRow key={index}>
-                                        <TableCell>{item.product_name || 'N/A'}</TableCell>
+                                        <TableCell>{item.product?.name || 'N/A'}</TableCell>
                                         <TableCell align="right">{item.quantity}</TableCell>
                                         <TableCell align="right">${parseFloat(item.unit_price).toFixed(2)}</TableCell>
                                         <TableCell align="right">
