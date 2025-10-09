@@ -20,7 +20,7 @@ const Section = ({ title, children }) => (
 );
 
 const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow }) => {
-    const [formData, setFormData] = useState({ 
+    const [formData, setFormData] = useState({
         items: [],
         colors: {},
         specifications: {},
@@ -38,77 +38,132 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
 
     // Data for dropdowns
     const [orderNotes, setOrderNotes] = useState([]);
-    const [products, setProducts] = useState([]);
+    const [productsFromSale, setProductsFromSale] = useState([]); // Productos de la venta seleccionada
     const [colors, setColors] = useState([]);
-    const [sellers, setSellers] = useState([]);
 
     const [loading, setLoading] = useState(false);
 
     const selectedOrderNote = orderNotes.find(on => on.id === formData.order_note_id);
+    
+    // Talles predefinidos para medias (no vienen del producto)
+    const mediaSizes = [
+        { id: 1, name: '35-37' },
+        { id: 2, name: '38-40' },
+        { id: 3, name: '41-43' },
+        { id: 4, name: '44-46' }
+    ];
+    
+    // Verificar si todos los talles ya fueron usados
+    const usedSizes = (formData.items || []).map(item => item.size);
+    const allSizesUsed = mediaSizes.every(size => usedSizes.includes(size.name)) && editingIndex === null;
 
+   useEffect(() => {
+            if (!open) return;
+            
+            const initializeForm = async () => {
+                setLoading(true);
+                try {
+                    const colorsPromise = api.list('/colors/');
+                    const notesPromise = api.list('/order-notes/?status=Pendiente');
+    
+                    const [notesData, colorsData] = await Promise.all([
+                        notesPromise, colorsPromise
+                    ]);
+                    
+                    setColors(colorsData.results || colorsData || []);
+                    
+                    let allNotes = notesData.results || notesData || [];
+                    
+                    allNotes = allNotes.filter(note => {
+                        if (!note.sale || !note.sale.items) return false;
+                        return note.sale.items.some(item => 
+                            item.product?.name?.toLowerCase().includes('media')
+                        );
+                    });
+                    
+                    if (order && order.order_note && !allNotes.some(n => n.id === order.order_note.id)) {
+                        allNotes = [order.order_note, ...allNotes];
+                    }
+                    setOrderNotes(allNotes);
+    
+                    if (order) {
+                        let specsObject = {};
+                        try {
+                            if (order.specifications && typeof order.specifications === 'string') {
+                                specsObject = JSON.parse(order.specifications);
+                            } else if (order.specifications && typeof order.specifications === 'object') {
+                                specsObject = order.specifications;
+                            }
+                        } catch (e) {
+                            console.error("Could not parse specifications JSON string: ", order.specifications);
+                        }
+    
+                        const details = order.customization_details || {};
+                        setFormData({
+                            ...order,
+                            order_note_id: order.order_note?.id || '',
+                            base_product_id: order.base_product?.id || '',
+                            items: order.items || [],
+                            colors: details.colors || {},
+                            specifications: specsObject,
+                        });
+                        
+                        if (order.order_note?.sale?.items) {
+                            const products = order.order_note.sale.items
+                                .map(item => item.product)
+                                .filter(p => p && p.name?.toLowerCase().includes('media'));
+                            setProductsFromSale(products);
+                        }
+                    } else {
+                        setFormData({ 
+                            items: [],
+                            colors: {},
+                            specifications: {},
+                            estimated_delivery_date: '',
+                            status: 'Pendiente'
+                        });
+                    }
+    
+                } catch (err) {
+                    console.error("Failed to init form", err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+    
+            initializeForm();
+        }, [open, order, creationFlow]);
+
+    // NUEVO: Cargar productos cuando se selecciona una nota de pedido
     useEffect(() => {
-        if (!open) return;
-        
-        const initializeForm = async () => {
-            setLoading(true);
-            try {
-                const colorsPromise = api.list('/colors/');
-                const productsPromise = api.list('/products/?is_manufactured=true');
-                const notesPromise = api.list('/order-notes/?status=Pendiente');
-                const sellersPromise = api.list('/users/');
-
-                const [productsData, notesData, colorsData, sellersData] = await Promise.all([
-                    productsPromise, notesPromise, colorsPromise, sellersPromise
-                ]);
-                
-                // Filtrar solo productos que sean medias
-                const mediasProducts = (productsData.results || productsData || [])
-                    .filter(product => product.name.toLowerCase().includes('media'));
-                setProducts(mediasProducts);
-                setColors(colorsData.results || colorsData || []);
-                setSellers(sellersData.results || sellersData || []);
-                
-                let allNotes = notesData.results || notesData || [];
-                if (order && order.order_note && !allNotes.some(n => n.id === order.order_note.id)) {
-                    allNotes = [order.order_note, ...allNotes];
-                }
-                setOrderNotes(allNotes);
-
-                if (order) {
-                    setFormData({
-                        ...order,
-                        order_note_id: order.order_note?.id || '',
-                        base_product_id: order.base_product?.id || '',
-                        items: order.items || [],
-                        colors: order.colors || {},
-                        specifications: order.specifications || {},
-                    });
-                } else {
-                    setFormData({ 
-                        items: [],
-                        colors: {},
-                        specifications: {},
-                        estimated_delivery_date: '',
-                        status: 'Pendiente'
-                    });
-                }
-
-            } catch (err) {
-                console.error("Failed to init form", err);
-            } finally {
-                setLoading(false);
+        if (formData.order_note_id && selectedOrderNote?.sale?.items) {
+            // FILTRO 2: Extraer solo productos "Medias" de la venta
+            const mediasProducts = selectedOrderNote.sale.items
+                .map(item => item.product)
+                .filter(p => p && p.name?.toLowerCase().includes('media'))
+                .filter((product, index, self) => 
+                    // Eliminar duplicados por ID
+                    index === self.findIndex(p => p.id === product.id)
+                );
+            
+            setProductsFromSale(mediasProducts);
+            
+            // Si solo hay un producto, seleccionarlo automáticamente
+            if (mediasProducts.length === 1 && !order) {
+                setFormData(prev => ({
+                    ...prev,
+                    base_product_id: mediasProducts[0].id
+                }));
             }
-        };
-
-        initializeForm();
-    }, [open, order, creationFlow]);
+        }
+    }, [formData.order_note_id, selectedOrderNote, order]);
 
     const handleFormChange = (e) => {
         const { name, value } = e.target;
         
         if (name.startsWith('color_')) {
             const key = name.replace('color_', '');
-            setFormData(prev => ({ 
+            setFormData(prev => ({
                 ...prev, 
                 colors: { 
                     ...prev.colors, 
@@ -117,7 +172,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
             }));
         } else if (name.startsWith('spec_')) {
             const key = name.replace('spec_', '');
-            setFormData(prev => ({ 
+            setFormData(prev => ({
                 ...prev, 
                 specifications: { 
                     ...prev.specifications, 
@@ -135,7 +190,35 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
     };
 
     const handleAddItem = () => {
-        if (!currentItem.size || !currentItem.quantity) return;
+        if (!currentItem.size || !currentItem.quantity || !formData.base_product_id) return;
+        
+        // VALIDACIÓN 1: No permitir talles duplicados (excepto al editar)
+        const existingTalles = (formData.items || [])
+            .filter((_, index) => index !== editingIndex)
+            .map(item => item.size);
+        
+        if (existingTalles.includes(currentItem.size)) {
+            alert(`⚠️ El talle ${currentItem.size} ya fue agregado. No se permiten talles duplicados.`);
+            return;
+        }
+        
+        // VALIDACIÓN 2: No exceder la cantidad vendida del producto seleccionado
+        const quantitySoldForProduct = selectedOrderNote?.sale?.items
+            .filter(item => item.product?.id === parseInt(formData.base_product_id))
+            .reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+        
+        // Calcular total ya agregado (excluyendo el item en edición)
+        const currentTotal = (formData.items || [])
+            .filter((_, index) => index !== editingIndex)
+            .reduce((sum, item) => sum + parseInt(item.quantity || 0), 0);
+        
+        const newTotal = currentTotal + parseInt(currentItem.quantity);
+        
+        if (newTotal > quantitySoldForProduct) {
+            alert(`⚠️ Cantidad excedida!\n\nVendido: ${quantitySoldForProduct} pares\nYa agregado: ${currentTotal} pares\nIntentando agregar: ${currentItem.quantity} pares\n\nTotal disponible: ${quantitySoldForProduct - currentTotal} pares`);
+            return;
+        }
+        
         const newItems = [...(formData.items || [])];
         if (editingIndex !== null) {
             newItems[editingIndex] = currentItem;
@@ -167,24 +250,55 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
     };
 
     const handleSave = () => {
-        const data = new FormData();
-        
-        // Append main fields
-        Object.keys(formData).forEach(key => {
-            if (key === 'items' || key === 'colors' || key === 'specifications') {
-                data.append(key, JSON.stringify(formData[key]));
-            } else if (formData[key] !== null && formData[key] !== undefined && formData[key] !== '') {
-                data.append(key, formData[key]);
+            const data = new FormData();
+    
+            // `colors` va en customization_details, `specifications` es un campo separado.
+            const customization_details = { colors: formData.colors };
+            const specifications_string = JSON.stringify(formData.specifications);
+    
+            // Construir un objeto 'backendData' limpio, sin propagar todo el 'formData'.
+            // Extraer los IDs de los colores seleccionados para el ManyToManyField
+            const selectedColorIds = Object.values(formData.colors)
+                                        .filter(id => id !== '' && id !== null && id !== undefined)
+                                        .map(Number);
+
+            const backendData = {
+                order_note: formData.order_note_id || null,
+                base_product: formData.base_product_id || null,
+                estimated_delivery_date: formData.estimated_delivery_date || null,
+                status: formData.status,
+                model: formData.model || '',
+                details: formData.details || '',
+                items: formData.items || [],
+                customization_details: customization_details,
+                specifications: specifications_string,
+                color_ids: selectedColorIds, // Añadir la lista de IDs de colores
+            };
+            
+            if (order && order.id) {
+                backendData.id = order.id;
             }
-        });
-
-        // Append files
-        productFiles.forEach((file, index) => {
-            data.append('product_files', file);
-        });
-
-        onSave(data);
-    };
+    
+            Object.keys(backendData).forEach(key => {
+                if (key === 'items' || key === 'customization_details' || key === 'specifications') {
+                    data.append(key, JSON.stringify(backendData[key]));
+                } else if (key === 'color_ids') {
+                    backendData[key].forEach(colorId => {
+                        data.append(key, colorId);
+                    });
+                } else if (backendData[key] !== null && backendData[key] !== undefined) {
+                    data.append(key, backendData[key]);
+                }
+            });
+            
+            data.append('op_type', 'Medias');
+            
+            productFiles.forEach((file) => {
+                data.append('product_files', file);
+            });
+            
+            onSave(data);
+        };
 
     const renderFileList = (files) => (
         <List dense>
@@ -239,7 +353,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                         
                         {creationFlow === 'fromSale' && (
                             <Grid item xs={12} md={6}>
-                                <FormControl fullWidth>
+                                <FormControl fullWidth required sx={{ minWidth: 200 }}>
                                     <InputLabel>Nota de Pedido Asociada</InputLabel>
                                     <Select
                                         value={formData.order_note_id || ''}
@@ -262,7 +376,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                                 label="Fecha Estimada de Entrega"
                                 name="estimated_delivery_date"
                                 type="date"
-                                value={selectedOrderNote?.delivery_date || formData.estimated_delivery_date || ''}
+                                value={selectedOrderNote?.estimated_delivery_date || formData.estimated_delivery_date || ''}
                                 onChange={handleFormChange}
                                 fullWidth
                                 disabled={!!selectedOrderNote}
@@ -314,21 +428,14 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                                 />
                             </Grid>
                             <Grid item xs={12} md={6}>
-                                <FormControl fullWidth required sx={{ minWidth: 200 }}>
-                                    <InputLabel>Vendedor</InputLabel>
-                                    <Select
-                                        value={formData.seller_id || ''}
-                                        label="Vendedor"
-                                        name="seller_id"
-                                        onChange={handleFormChange}
-                                    >
-                                        {sellers.map((seller) => (
-                                            <MenuItem key={seller.id} value={seller.id}>
-                                                {seller.first_name} {seller.last_name}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
+                                <TextField
+                                    label="Vendedor"
+                                    value={selectedOrderNote?.sale?.user?.first_name 
+                                        ? `${selectedOrderNote.sale.user.first_name} ${selectedOrderNote.sale.user.last_name || ''}`.trim()
+                                        : 'N/A'}
+                                    disabled
+                                    fullWidth
+                                />
                             </Grid>
                         </Grid>
                     </Section>
@@ -345,12 +452,19 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                                     label="Producto"
                                     name="base_product_id"
                                     onChange={handleFormChange}
+                                    disabled={productsFromSale.length === 0}
                                 >
-                                    {products.map((product) => (
-                                        <MenuItem key={product.id} value={product.id}>
-                                            {product.name}
+                                    {productsFromSale.length > 0 ? (
+                                        productsFromSale.map((product) => (
+                                            <MenuItem key={product.id} value={product.id}>
+                                                {product.name}
+                                            </MenuItem>
+                                        ))
+                                    ) : (
+                                        <MenuItem disabled value="">
+                                            Seleccione una Nota de Pedido primero
                                         </MenuItem>
-                                    ))}
+                                    )}
                                 </Select>
                             </FormControl>
                         </Grid>
@@ -394,10 +508,11 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                                     name="size"
                                     onChange={handleCurrentItemChange}
                                 >
-                                    <MenuItem value="35-37">35-37</MenuItem>
-                                    <MenuItem value="38-40">38-40</MenuItem>
-                                    <MenuItem value="41-43">41-43</MenuItem>
-                                    <MenuItem value="44-46">44-46</MenuItem>
+                                    {mediaSizes.map((size) => (
+                                        <MenuItem key={size.id} value={size.id}>
+                                            {size.name}
+                                        </MenuItem>
+                                    ))}
                                 </Select>
                             </FormControl>
                         </Grid>
@@ -427,8 +542,9 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                                 variant="contained"
                                 onClick={handleAddItem}
                                 fullWidth
-                                disabled={!currentItem.size || !currentItem.quantity}
+                                disabled={!currentItem.size || !currentItem.quantity || !formData.base_product_id || allSizesUsed}
                                 sx={{ height: '56px' }}
+                                title={allSizesUsed ? 'Todos los talles disponibles ya fueron agregados' : ''}
                             >
                                 {editingIndex !== null ? 'Actualizar' : 'Agregar'}
                             </Button>
@@ -439,6 +555,13 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                         <Box sx={{ mt: 3 }}>
                             <Typography variant="h6" gutterBottom>
                                 Listado de Talles - Total: {formData.items.reduce((sum, item) => sum + parseInt(item.quantity || 0), 0)} pares
+                                {selectedOrderNote?.sale?.items && formData.base_product_id && (
+                                    <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                                        (Vendido: {selectedOrderNote.sale.items
+                                            .filter(item => item.product?.id === parseInt(formData.base_product_id))
+                                            .reduce((sum, item) => sum + (item.quantity || 0), 0)} pares)
+                                    </Typography>
+                                )}
                             </Typography>
                             <TableContainer component={Paper}>
                                 <Table size="small">
@@ -453,7 +576,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                                     <TableBody>
                                         {formData.items.map((item, index) => (
                                             <TableRow key={index}>
-                                                <TableCell>{item.size}</TableCell>
+                                                <TableCell>{mediaSizes.find(s => s.id === item.size)?.name || item.size}</TableCell>
                                                 <TableCell>{item.quantity}</TableCell>
                                                 <TableCell>{item.detail}</TableCell>
                                                 <TableCell>
@@ -492,7 +615,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                                     onChange={handleFormChange}
                                 >
                                     {colors.map((color) => (
-                                        <MenuItem key={color.id} value={color.name}>
+                                        <MenuItem key={color.id} value={color.id}>
                                             {color.name}
                                         </MenuItem>
                                     ))}
@@ -510,7 +633,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                                     onChange={handleFormChange}
                                 >
                                     {colors.map((color) => (
-                                        <MenuItem key={color.id} value={color.name}>
+                                        <MenuItem key={color.id} value={color.id}>
                                             {color.name}
                                         </MenuItem>
                                     ))}
@@ -528,7 +651,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                                     onChange={handleFormChange}
                                 >
                                     {colors.map((color) => (
-                                        <MenuItem key={color.id} value={color.name}>
+                                        <MenuItem key={color.id} value={color.id}>
                                             {color.name}
                                         </MenuItem>
                                     ))}
@@ -546,7 +669,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                                     onChange={handleFormChange}
                                 >
                                     {colors.map((color) => (
-                                        <MenuItem key={color.id} value={color.name}>
+                                        <MenuItem key={color.id} value={color.id}>
                                             {color.name}
                                         </MenuItem>
                                     ))}
@@ -564,7 +687,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                                     onChange={handleFormChange}
                                 >
                                     {colors.map((color) => (
-                                        <MenuItem key={color.id} value={color.name}>
+                                        <MenuItem key={color.id} value={color.id}>
                                             {color.name}
                                         </MenuItem>
                                     ))}

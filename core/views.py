@@ -120,7 +120,7 @@ class ProductionOrderViewSet(TenantAwareViewSet):
     serializer_class = ProductionOrderSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().prefetch_related('items') # Add prefetch_related
         op_type = self.request.query_params.get('op_type')
         if op_type:
             queryset = queryset.filter(op_type=op_type)

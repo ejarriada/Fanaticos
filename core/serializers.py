@@ -504,7 +504,14 @@ class ProductionOrderFileSerializer(TenantAwareSerializer):
 class ProductionOrderSerializer(TenantAwareSerializer):
     items = ProductionOrderItemSerializer(many=True, required=False)
     files = ProductionOrderFileSerializer(many=True, read_only=True)
-    
+    colors = ColorSerializer(many=True, read_only=True)
+    color_ids = serializers.PrimaryKeyRelatedField(
+           queryset=Color.objects.all(), 
+           source='colors', 
+           many=True, 
+           write_only=True, 
+           required=False
+    )
     order_note = serializers.PrimaryKeyRelatedField(
         queryset=OrderNote.objects.all(), allow_null=True, required=False
     )
@@ -527,28 +534,50 @@ class ProductionOrderSerializer(TenantAwareSerializer):
             'current_process',
             'details',
             'items',
-            'files'
+            'files',
+            'estimated_delivery_date',  
+            'colors',                    
+            'color_ids',                 
+            'specifications',            
+            'model'
         ]
-        read_only_fields = ('creation_date',)
-
     def to_internal_value(self, data):
-        import json
-        # We're converting the QueryDict to a mutable dict to modify it.
+        """
+        This method is crucial for handling JSON-stringified data (like 'items')
+        sent within a multipart/form-data request, which is necessary when
+        uploading files from the frontend.
+        """
+        # The frontend sends 'items', 'specifications', and 'customization_details' as JSON strings
+        # within the FormData object. We need to parse them back into Python objects.
         mutable_data = data.copy()
-
-        items_str = mutable_data.get('items')
-        if items_str and isinstance(items_str, str):
+        
+        # Explicitly parse customization_details
+        customization_details_value = mutable_data.pop('customization_details', None)
+        if customization_details_value and isinstance(customization_details_value, str):
             try:
-                mutable_data['items'] = json.loads(items_str)
-            except json.JSONDecodeError:
-                raise serializers.ValidationError({'items': 'Invalid JSON string.'})
+                parsed_cd = json.loads(customization_details_value)
+                if parsed_cd == {}:
+                    mutable_data['customization_details'] = None
+                else:
+                    mutable_data['customization_details'] = parsed_cd
+            except (json.JSONDecodeError, TypeError):
+                raise serializers.ValidationError({'customization_details': "Invalid JSON format or unexpected type."})
+        elif customization_details_value is None:
+            mutable_data['customization_details'] = None # Ensure it's None if not provided
 
-        details_str = mutable_data.get('customization_details')
-        if details_str and isinstance(details_str, str):
+        # Explicitly parse specifications
+        specifications_value = mutable_data.pop('specifications', None)
+        if specifications_value and isinstance(specifications_value, str):
             try:
-                mutable_data['customization_details'] = json.loads(details_str)
-            except json.JSONDecodeError:
-                raise serializers.ValidationError({'customization_details': 'Invalid JSON string.'})
+                parsed_specs = json.loads(specifications_value)
+                if parsed_specs == {}:
+                    mutable_data['specifications'] = None
+                else:
+                    mutable_data['specifications'] = parsed_specs
+            except (json.JSONDecodeError, TypeError):
+                raise serializers.ValidationError({'specifications': "Invalid JSON format or unexpected type."})
+        elif specifications_value is None:
+            mutable_data['specifications'] = None # Ensure it's None if not provided
         
         return super().to_internal_value(mutable_data)
 
@@ -584,6 +613,7 @@ class ProductionOrderSerializer(TenantAwareSerializer):
 
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
+        colors_data = validated_data.pop('colors', [])
         
         # Pop file lists before calling super().create()
         escudo_files = validated_data.pop('escudo_files', [])
@@ -591,8 +621,49 @@ class ProductionOrderSerializer(TenantAwareSerializer):
         template_files = validated_data.pop('template_files', [])
 
         with transaction.atomic():
-            production_order = ProductionOrder.objects.create(**validated_data)
+            # The tenant is expected to be in the validated_data from the view
+            # Pop fields that are handled separately or are read-only
+            order_note = validated_data.pop('order_note', None)
+            base_product = validated_data.pop('base_product', None)
+            estimated_delivery_date = validated_data.pop('estimated_delivery_date', None)
+            equipo = validated_data.pop('equipo', '')
+            detalle_equipo = validated_data.pop('detalle_equipo', '')
+            customization_details = validated_data.pop('customization_details', {})
+            op_type = validated_data.pop('op_type', '')
+            status = validated_data.pop('status', 'Pendiente')
+            current_process = validated_data.pop('current_process', '')
+            details = validated_data.pop('details', '')
+            model = validated_data.pop('model', '')
+            specifications = validated_data.pop('specifications', {})
+
+            production_order = ProductionOrder.objects.create(
+                order_note=order_note,
+                base_product=base_product,
+                estimated_delivery_date=estimated_delivery_date,
+                equipo=equipo,
+                detalle_equipo=detalle_equipo,
+                customization_details=customization_details,
+                op_type=op_type,
+                status=status,
+                current_process=current_process,
+                details=details,
+                model=model,
+                specifications=specifications,
+                **validated_data # This will now contain only the tenant and other remaining fields
+            )
+
+            if colors_data:
+                production_order.colors.set(colors_data)
+
             for item_data in items_data:
+                size_id = item_data.pop('size', None)
+                if size_id:
+                    item_data['size_id'] = size_id
+                
+                product_id = item_data.pop('product', None)
+                if product_id:
+                    item_data['product_id'] = product_id
+                
                 ProductionOrderItem.objects.create(
                     production_order=production_order, 
                     tenant=production_order.tenant, 
@@ -641,19 +712,35 @@ class ProductionOrderSerializer(TenantAwareSerializer):
         instance.status = validated_data.get('status', instance.status)
         instance.current_process = validated_data.get('current_process', instance.current_process)
         instance.details = validated_data.get('details', instance.details)
+        instance.model = validated_data.get('model', instance.model)
+        instance.specifications = validated_data.get('specifications', instance.specifications)
+        
+        # Save scalar fields before handling many-to-many for colors
         instance.save()
+
+        # Handle colors (many-to-many)
+        if 'colors' in validated_data:
+            colors_data = validated_data.get('colors')
+            instance.colors.set(colors_data)
 
         # Handle the nested items only if they were provided
         if items_data is not None:
             with transaction.atomic():
                 instance.items.all().delete()
                 for item_data in items_data:
+                    size_id = item_data.pop('size', None)
+                    if size_id:
+                        item_data['size_id'] = size_id
+                    
+                    product_id = item_data.pop('product', None)
+                    if product_id:
+                        item_data['product_id'] = product_id
+                    
                     ProductionOrderItem.objects.create(
                         production_order=instance,
                         tenant=instance.tenant,
                         **item_data
-                    )
-            
+                    )            
         # Handle files: delete existing and create new ones
         # Note: This file handling logic might need adjustment based on desired behavior (e.g., only updating if new files are sent)
         if escudo_files or sponsor_files or template_files:
