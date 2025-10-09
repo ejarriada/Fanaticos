@@ -97,14 +97,33 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                         } catch (e) {
                             console.error("Could not parse specifications JSON string: ", order.specifications);
                         }
-    
-                        const details = order.customization_details || {};
+                        
+                        // ===== RECONSTRUIR colors desde el ManyToMany =====
+                        const colorsMap = {};
+                        if (order.colors && Array.isArray(order.colors)) {
+                            if (order.colors[0]) colorsMap.base = order.colors[0].id;
+                            if (order.colors[1]) colorsMap.secundario = order.colors[1].id;
+                            if (order.colors[2]) colorsMap.puno = order.colors[2].id;
+                            if (order.colors[3]) colorsMap.puntera = order.colors[3].id;
+                            if (order.colors[4]) colorsMap.talon = order.colors[4].id;
+                        }
+                        // ===================================================
+                        
+                        // ===== CONVERTIR TALLES DE STRING A ID =====
+                        const itemsWithIds = (order.items || []).map(item => {
+                            const talleObj = mediaSizes.find(s => s.name === item.size);
+                            return {
+                                ...item,
+                                size: talleObj ? talleObj.id : item.size  // Convertir nombre a ID
+                            };
+                        });
+                        // ============================================
                         setFormData({
                             ...order,
                             order_note_id: order.order_note?.id || '',
                             base_product_id: order.base_product?.id || '',
-                            items: order.items || [],
-                            colors: details.colors || {},
+                            items: itemsWithIds,
+                            colors: colorsMap,  // ✅ Colores desde ManyToMany
                             specifications: specsObject,
                         });
                         
@@ -115,7 +134,7 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
                             setProductsFromSale(products);
                         }
                     } else {
-                        setFormData({ 
+                        setFormData({
                             items: [],
                             colors: {},
                             specifications: {},
@@ -250,55 +269,73 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
     };
 
     const handleSave = () => {
-            const data = new FormData();
-    
-            // `colors` va en customization_details, `specifications` es un campo separado.
-            const customization_details = { colors: formData.colors };
-            const specifications_string = JSON.stringify(formData.specifications);
-    
-            // Construir un objeto 'backendData' limpio, sin propagar todo el 'formData'.
-            // Extraer los IDs de los colores seleccionados para el ManyToManyField
-            const selectedColorIds = Object.values(formData.colors)
-                                        .filter(id => id !== '' && id !== null && id !== undefined)
-                                        .map(Number);
+        const data = new FormData();
+        
+        console.log('🎨 formData.colors:', formData.colors);
+        // ===== IMPORTANTE: Separar colors para el ManyToMany =====
+        // Los IDs de colores van directamente como color_ids
+        const selectedColorIds = Object.values(formData.colors)
+            .filter(id => id !== '' && id !== null && id !== undefined)
+            .map(Number);
 
-            const backendData = {
-                order_note: formData.order_note_id || null,
-                base_product: formData.base_product_id || null,
-                estimated_delivery_date: formData.estimated_delivery_date || null,
-                status: formData.status,
-                model: formData.model || '',
-                details: formData.details || '',
-                items: formData.items || [],
-                customization_details: customization_details,
-                specifications: specifications_string,
-                color_ids: selectedColorIds, // Añadir la lista de IDs de colores
+        console.log('🎨 selectedColorIds:', selectedColorIds);
+
+        // ===== MODIFICACIÓN: Items deben incluir product_id =====
+        const itemsWithProduct = (formData.items || []).map(item => {
+            // ===== BUSCAR EL NOMBRE DEL TALLE =====
+            const talleObj = mediaSizes.find(s => s.id === parseInt(item.size));
+            const talleName = talleObj ? talleObj.name : item.size;
+            // =======================================
+            
+            return {
+                size: talleName,  // ✅ Enviar el nombre, no el ID
+                quantity: item.quantity,
+                detail: item.detail || '',
+                product: formData.base_product_id
             };
-            
-            if (order && order.id) {
-                backendData.id = order.id;
-            }
-    
-            Object.keys(backendData).forEach(key => {
-                if (key === 'items' || key === 'customization_details' || key === 'specifications') {
-                    data.append(key, JSON.stringify(backendData[key]));
-                } else if (key === 'color_ids') {
-                    backendData[key].forEach(colorId => {
-                        data.append(key, colorId);
-                    });
-                } else if (backendData[key] !== null && backendData[key] !== undefined) {
-                    data.append(key, backendData[key]);
-                }
-            });
-            
-            data.append('op_type', 'Medias');
-            
-            productFiles.forEach((file) => {
-                data.append('product_files', file);
-            });
-            
-            onSave(data);
+    });
+
+        // ===== MODIFICACIÓN: Specifications simplificado =====
+        // Convertir specifications a string simple o JSON plano
+        const specificationsStr = JSON.stringify(formData.specifications || {});
+
+        const backendData = {
+            order_note: formData.order_note_id || null,
+            base_product: formData.base_product_id || null,
+            estimated_delivery_date: formData.estimated_delivery_date || null,
+            status: formData.status,
+            model: formData.model || '',
+            details: formData.details || '',
+            items: itemsWithProduct, // Items con product_id
+            specifications: specificationsStr, // Como string
+            color_ids: selectedColorIds, // IDs de colores para ManyToMany
         };
+        
+        if (order && order.id) {
+            backendData.id = order.id;
+        }
+
+        // Agregar campos al FormData
+        Object.keys(backendData).forEach(key => {
+            if (key === 'items') {
+                data.append(key, JSON.stringify(backendData[key]));
+            } else if (key === 'color_ids') {
+                backendData[key].forEach(colorId => {
+                    data.append(key, colorId);
+                });
+            } else if (backendData[key] !== null && backendData[key] !== undefined) {
+                data.append(key, backendData[key]);
+            }
+        });
+        
+        data.append('op_type', 'Medias');
+        
+        productFiles.forEach((file) => {
+            data.append('product_files', file);
+        });
+        
+        onSave(data);
+    };
 
     const renderFileList = (files) => (
         <List dense>

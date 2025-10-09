@@ -30,7 +30,7 @@ from .models import (
 from .serializers import (
     ProductSerializer, TenantSerializer, UserSerializer, UserCreateSerializer, 
     SystemRoleSerializer, ProcessSerializer, OrderNoteSerializer, 
-    ProductionOrderSerializer, 
+    ProductionOrderReadOnlySerializer, ProductionOrderIndumentariaSerializer, ProductionOrderMediasSerializer, # REFACTORED
     RawMaterialSerializer, BrandSerializer, MateriaPrimaProveedorSerializer, PedidoMaterialSerializer, # Refactored Raw Material Serializers
     ProductionProcessLogSerializer, LocalSerializer, SaleSerializer, 
     InventorySerializer, SupplierSerializer, PurchaseOrderSerializer, 
@@ -117,7 +117,26 @@ class ProcessViewSet(TenantAwareViewSet): queryset = Process.objects.all(); seri
 class OrderNoteViewSet(TenantAwareViewSet): queryset = OrderNote.objects.all(); serializer_class = OrderNoteSerializer
 class ProductionOrderViewSet(TenantAwareViewSet):
     queryset = ProductionOrder.objects.all()
-    serializer_class = ProductionOrderSerializer
+    # serializer_class = ProductionOrderSerializer # REMOVED FOR DYNAMIC SELECTION
+
+    def get_serializer_class(self):
+        """
+        Selecciona dinámicamente el serializador basado en la acción y el op_type.
+        """
+        # Para operaciones de escritura (crear/actualizar), decidimos por el op_type
+        if self.action in ['create', 'update', 'partial_update']:
+            # El op_type debería venir en los datos de la solicitud
+            op_type = self.request.data.get('op_type')
+            if op_type == 'Medias':
+                return ProductionOrderMediasSerializer
+            elif op_type == 'Indumentaria':
+                return ProductionOrderIndumentariaSerializer
+            # Si no hay op_type en una escritura, podría ser un error o necesitar un default
+            # Devolver el de solo lectura puede ayudar a mostrar errores de validación claros
+            return ProductionOrderReadOnlySerializer
+
+        # Para operaciones de lectura (list, retrieve), usamos el de solo lectura
+        return ProductionOrderReadOnlySerializer
 
     def get_queryset(self):
         queryset = super().get_queryset().prefetch_related('items') # Add prefetch_related
@@ -129,6 +148,29 @@ class ProductionOrderViewSet(TenantAwareViewSet):
     def perform_create(self, serializer):
         tenant = self.get_tenant()
         serializer.save(tenant=tenant)
+
+    # ===== AGREGAR ESTE MÉTODO =====
+    def update(self, request, *args, **kwargs):
+        print("\n" + "🔥"*40)
+        print("🔍 ENTRANDO A UPDATE")
+        print(f"request.data keys: {list(request.data.keys())}")
+        print("🔥"*40 + "\n")
+        
+        try:
+            response = super().update(request, *args, **kwargs)
+            print("\n✅ UPDATE EXITOSO\n")
+            return response
+        except Exception as e:
+            print("\n" + "❌"*40)
+            print(f"ERROR EN UPDATE: {type(e).__name__}")
+            print(f"Mensaje: {str(e)}")
+            if hasattr(e, 'detail'):
+                print(f"Detail: {e.detail}")
+            import traceback
+            print(f"Traceback:\n{traceback.format_exc()}")
+            print("❌"*40 + "\n")
+            raise
+    # ================================
 
     @action(detail=True, methods=['post'], url_path='complete-process')
     def complete_process(self, request, pk=None):

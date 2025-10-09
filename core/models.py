@@ -343,7 +343,12 @@ class ProductionOrder(TenantAwareModel):
     base_product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True, help_text="Producto base usado como plantilla para talles y colores.")
     equipo = models.CharField(max_length=255, blank=True)
     detalle_equipo = models.CharField(max_length=255, blank=True)
-    customization_details = models.JSONField(default=dict, blank=True, help_text="Detalles de personalización como tipo de escudo, tela, cuello, etc.")
+    customization_details = models.JSONField(
+        default=dict, 
+        blank=True, 
+        null=True,  # ← AGREGAR ESTO
+        help_text="Detalles de personalización como tipo de escudo, tela, cuello, etc."
+    )
 
     op_type = models.CharField(max_length=50, choices=OP_TYPE_CHOICES)
     status = models.CharField(max_length=50, default='Pendiente', choices=STATUS_CHOICES)
@@ -354,7 +359,7 @@ class ProductionOrder(TenantAwareModel):
     colors = models.ManyToManyField(Color, blank=True)
     specifications = models.CharField(max_length=255, blank=True)
     model = models.CharField(max_length=255, blank=True)
-
+    
     def save(self, *args, **kwargs):
         if not self.estimated_delivery_date and self.order_note:
             self.estimated_delivery_date = self.order_note.estimated_delivery_date
@@ -369,6 +374,7 @@ class ProductionOrderItem(TenantAwareModel):
     quantity = models.IntegerField()
     size = models.CharField(max_length=50) # O podría ser un FK a Size si los talles son estándar
     color = models.CharField(max_length=50, blank=True) # NEW FIELD
+    detail = models.CharField(max_length=255, blank=True) # NEW FIELD
     customizations = models.JSONField(default=dict, blank=True, null=True)
 
     def __str__(self):
