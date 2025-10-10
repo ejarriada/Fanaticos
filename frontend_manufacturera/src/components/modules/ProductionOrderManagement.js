@@ -92,22 +92,15 @@ const ProductionOrderManagement = () => {
 
     const handleSave = async (formData) => {
         try {
-            console.log('=== TIPO DE DATO RECIBIDO ===');
-            console.log('Es FormData?', formData instanceof FormData);
-            console.log('==============================');
 
             const dataToSend = new FormData();
             
             if (formData instanceof FormData) {
-                console.log('=== COPIANDO FORMDATA ===');
                 for (let [key, value] of formData.entries()) {
-                    console.log(`Copiando: ${key} = ${value}`);
                     dataToSend.append(key, value);
                 }
             } else {
-                console.log('=== PROCESANDO OBJETO (NO DEBERÍA PASAR) ===');
                 Object.keys(formData).forEach(key => {
-                    console.log(`Procesando key: ${key}, tipo: ${typeof formData[key]}`);
                     if (typeof formData[key] === 'object' && formData[key] !== null) {
                         dataToSend.append(key, JSON.stringify(formData[key]));
                     } else if (formData[key] !== null && formData[key] !== undefined) {
@@ -115,17 +108,6 @@ const ProductionOrderManagement = () => {
                     }
                 });
             }
-            
-            // Esta línea puede estar duplicando op_type
-            console.log('=== AGREGANDO OP_TYPE ===');
-            console.log(`selectedProductType: ${selectedProductType}`);
-            dataToSend.append('op_type', selectedProductType);
-            
-            console.log('=== FORMDATA FINAL ===');
-            for (let [key, value] of dataToSend.entries()) {
-                console.log(`${key}: ${value}`);
-            }
-            console.log('======================');
             
             if (selectedOrder) {
                 await api.update('/production-orders/', selectedOrder.id, dataToSend, {

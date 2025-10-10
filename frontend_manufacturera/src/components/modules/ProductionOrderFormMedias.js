@@ -57,101 +57,142 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
     const usedSizes = (formData.items || []).map(item => item.size);
     const allSizesUsed = mediaSizes.every(size => usedSizes.includes(size.name)) && editingIndex === null;
 
-   useEffect(() => {
-            if (!open) return;
-            
-            const initializeForm = async () => {
-                setLoading(true);
-                try {
-                    const colorsPromise = api.list('/colors/');
-                    const notesPromise = api.list('/order-notes/?status=Pendiente');
-    
-                    const [notesData, colorsData] = await Promise.all([
-                        notesPromise, colorsPromise
-                    ]);
+    useEffect(() => {
+        if (!open) return;
+        
+        const initializeForm = async () => {
+            setLoading(true);
+            try {
+                const colorsPromise = api.list('/colors/');
+                const notesPromise = api.list('/order-notes/?status=Pendiente');
+
+                const [notesData, colorsData] = await Promise.all([
+                    notesPromise, colorsPromise
+                ]);
+                
+                setColors(colorsData.results || colorsData || []);
+                
+                let allNotes = notesData.results || notesData || [];
+                
+                allNotes = allNotes.filter(note => {
+                    if (!note.sale || !note.sale.items) return false;
+                    return note.sale.items.some(item => 
+                        item.product?.name?.toLowerCase().includes('media')
+                    );
+                });
+                
+                if (order && order.order_note && !allNotes.some(n => n.id === order.order_note.id)) {
+                    allNotes = [order.order_note, ...allNotes];
+                }
+                setOrderNotes(allNotes);
+
+                if (order) {
+                    console.log('🔵 ORDER COMPLETA:', order);
+                    console.log('🔵 order.specifications:', order.specifications);
+                    console.log('🔵 order.colors:', order.colors);
                     
-                    setColors(colorsData.results || colorsData || []);
+                    let specsObject = {};
+                    try {
+                        if (order.specifications && typeof order.specifications === 'string') {
+                            specsObject = JSON.parse(order.specifications);
+                        } else if (order.specifications && typeof order.specifications === 'object') {
+                            specsObject = order.specifications;
+                        }
+                    } catch (e) {
+                        console.error("Could not parse specifications JSON string: ", order.specifications);
+                    }
                     
-                    let allNotes = notesData.results || notesData || [];
+                    console.log('🔵 specsObject parseado:', specsObject);
                     
-                    allNotes = allNotes.filter(note => {
-                        if (!note.sale || !note.sale.items) return false;
-                        return note.sale.items.some(item => 
-                            item.product?.name?.toLowerCase().includes('media')
-                        );
+                    // ===== RECONSTRUIR colors (compatible con versiones antiguas y nuevas) =====
+                    let colorsMap = {};
+                    
+                    // CASO 1: Colores guardados en specifications (nuevo formato)
+                    if (specsObject.color_base || specsObject.color_secundario || specsObject.color_puno || 
+                        specsObject.color_puntera || specsObject.color_talon) {
+                        colorsMap = {
+                            base: specsObject.color_base || null,
+                            secundario: specsObject.color_secundario || null,
+                            puno: specsObject.color_puno || null,
+                            puntera: specsObject.color_puntera || null,
+                            talon: specsObject.color_talon || null,
+                        };
+                        console.log('✅ Colores cargados desde specifications (nuevo formato)');
+                    }
+                    // CASO 2: Colores en el array order.colors (formato antiguo - fallback)
+                    else if (order.colors && Array.isArray(order.colors)) {
+                        // Intentar mapear por posición (mejor que nada para órdenes antiguas)
+                        colorsMap = {
+                            base: order.colors[0]?.id || null,
+                            secundario: order.colors[1]?.id || null,
+                            puno: order.colors[2]?.id || null,
+                            puntera: order.colors[3]?.id || null,
+                            talon: order.colors[4]?.id || null,
+                        };
+                        console.log('⚠️ Colores cargados desde array (formato antiguo)');
+                    }
+                    // CASO 3: Sin colores
+                    else {
+                        colorsMap = {
+                            base: null,
+                            secundario: null,
+                            puno: null,
+                            puntera: null,
+                            talon: null,
+                        };
+                        console.log('ℹ️ Sin colores para cargar');
+                    }
+                    
+                    console.log('🔵 colorsMap reconstruido:', colorsMap);
+                    
+                    // Limpiar colores de specifications para no duplicar
+                    const { color_base, color_secundario, color_puno, color_puntera, color_talon, ...cleanSpecs } = specsObject;
+                    // ===================================================
+                    
+                    const itemsWithIds = (order.items || []).map((item) => {
+                        if (typeof item.size === 'number') {
+                            return item;
+                        }
+                        
+                        const talleObj = mediaSizes.find(s => {
+                            const match = s.name === item.size || s.name === String(item.size);
+                            return match;
+                        });
+                        
+                        const result = {
+                            ...item,
+                            size: talleObj ? talleObj.id : item.size
+                        };
+                        
+                        return result;
                     });
                     
-                    if (order && order.order_note && !allNotes.some(n => n.id === order.order_note.id)) {
-                        allNotes = [order.order_note, ...allNotes];
+                    setFormData({
+                        ...order,
+                        order_note_id: order.order_note?.id || '',
+                        base_product_id: order.base_product?.id || '',
+                        items: itemsWithIds,
+                        colors: colorsMap,
+                        specifications: cleanSpecs,
+                    });
+                    
+                    if (order.order_note?.sale?.items) {
+                        const products = order.order_note.sale.items
+                            .map(item => item.product)
+                            .filter(p => p && p.name?.toLowerCase().includes('media'));
+                        setProductsFromSale(products);
                     }
-                    setOrderNotes(allNotes);
-    
-                    if (order) {
-                        let specsObject = {};
-                        try {
-                            if (order.specifications && typeof order.specifications === 'string') {
-                                specsObject = JSON.parse(order.specifications);
-                            } else if (order.specifications && typeof order.specifications === 'object') {
-                                specsObject = order.specifications;
-                            }
-                        } catch (e) {
-                            console.error("Could not parse specifications JSON string: ", order.specifications);
-                        }
-                        
-                        // ===== RECONSTRUIR colors desde el ManyToMany =====
-                        const colorsMap = {};
-                        if (order.colors && Array.isArray(order.colors)) {
-                            if (order.colors[0]) colorsMap.base = order.colors[0].id;
-                            if (order.colors[1]) colorsMap.secundario = order.colors[1].id;
-                            if (order.colors[2]) colorsMap.puno = order.colors[2].id;
-                            if (order.colors[3]) colorsMap.puntera = order.colors[3].id;
-                            if (order.colors[4]) colorsMap.talon = order.colors[4].id;
-                        }
-                        // ===================================================
-                        
-                        // ===== CONVERTIR TALLES DE STRING A ID =====
-                        const itemsWithIds = (order.items || []).map(item => {
-                            const talleObj = mediaSizes.find(s => s.name === item.size);
-                            return {
-                                ...item,
-                                size: talleObj ? talleObj.id : item.size  // Convertir nombre a ID
-                            };
-                        });
-                        // ============================================
-                        setFormData({
-                            ...order,
-                            order_note_id: order.order_note?.id || '',
-                            base_product_id: order.base_product?.id || '',
-                            items: itemsWithIds,
-                            colors: colorsMap,  // ✅ Colores desde ManyToMany
-                            specifications: specsObject,
-                        });
-                        
-                        if (order.order_note?.sale?.items) {
-                            const products = order.order_note.sale.items
-                                .map(item => item.product)
-                                .filter(p => p && p.name?.toLowerCase().includes('media'));
-                            setProductsFromSale(products);
-                        }
-                    } else {
-                        setFormData({
-                            items: [],
-                            colors: {},
-                            specifications: {},
-                            estimated_delivery_date: '',
-                            status: 'Pendiente'
-                        });
-                    }
-    
-                } catch (err) {
-                    console.error("Failed to init form", err);
-                } finally {
-                    setLoading(false);
                 }
-            };
-    
-            initializeForm();
-        }, [open, order, creationFlow]);
+
+            } catch (err) {
+                console.error("Failed to init form", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        initializeForm();
+    }, [open, order, creationFlow]);
 
     // NUEVO: Cargar productos cuando se selecciona una nota de pedido
     useEffect(() => {
@@ -271,33 +312,45 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
     const handleSave = () => {
         const data = new FormData();
         
-        console.log('🎨 formData.colors:', formData.colors);
+        console.log('💾 === GUARDANDO ORDEN ===');
+        console.log('💾 formData.colors:', formData.colors);
+        
+        // ===== NUEVO: Guardar colores en specifications =====
+        const specificationsWithColors = {
+            ...(formData.specifications || {}),
+            color_base: formData.colors?.base || null,
+            color_secundario: formData.colors?.secundario || null,
+            color_puno: formData.colors?.puno || null,
+            color_puntera: formData.colors?.puntera || null,
+            color_talon: formData.colors?.talon || null,
+        };
+        
+        console.log('💾 specificationsWithColors:', specificationsWithColors);
+        
         // ===== IMPORTANTE: Separar colors para el ManyToMany =====
-        // Los IDs de colores van directamente como color_ids
-        const selectedColorIds = Object.values(formData.colors)
+        const selectedColorIds = Object.values(formData.colors || {})
             .filter(id => id !== '' && id !== null && id !== undefined)
             .map(Number);
 
-        console.log('🎨 selectedColorIds:', selectedColorIds);
+        console.log('💾 selectedColorIds:', selectedColorIds);
 
-        // ===== MODIFICACIÓN: Items deben incluir product_id =====
+        // ===== Items deben incluir product_id =====
         const itemsWithProduct = (formData.items || []).map(item => {
-            // ===== BUSCAR EL NOMBRE DEL TALLE =====
             const talleObj = mediaSizes.find(s => s.id === parseInt(item.size));
             const talleName = talleObj ? talleObj.name : item.size;
-            // =======================================
             
             return {
-                size: talleName,  // ✅ Enviar el nombre, no el ID
+                size: talleName,
                 quantity: item.quantity,
                 detail: item.detail || '',
                 product: formData.base_product_id
             };
-    });
+        });
 
-        // ===== MODIFICACIÓN: Specifications simplificado =====
-        // Convertir specifications a string simple o JSON plano
-        const specificationsStr = JSON.stringify(formData.specifications || {});
+        // ===== MODIFICADO: Specifications CON colores =====
+        const specificationsStr = JSON.stringify(specificationsWithColors);
+        
+        console.log('💾 specificationsStr:', specificationsStr);
 
         const backendData = {
             order_note: formData.order_note_id || null,
@@ -306,9 +359,9 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
             status: formData.status,
             model: formData.model || '',
             details: formData.details || '',
-            items: itemsWithProduct, // Items con product_id
-            specifications: specificationsStr, // Como string
-            color_ids: selectedColorIds, // IDs de colores para ManyToMany
+            items: itemsWithProduct,
+            specifications: specificationsStr, // ← CON COLORES
+            color_ids: selectedColorIds,
         };
         
         if (order && order.id) {
@@ -333,6 +386,8 @@ const ProductionOrderFormMedias = ({ open, onClose, onSave, order, creationFlow 
         productFiles.forEach((file) => {
             data.append('product_files', file);
         });
+        
+        console.log('💾 === FIN GUARDANDO ===');
         
         onSave(data);
     };

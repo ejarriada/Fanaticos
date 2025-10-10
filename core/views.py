@@ -151,24 +151,13 @@ class ProductionOrderViewSet(TenantAwareViewSet):
 
     # ===== AGREGAR ESTE MÉTODO =====
     def update(self, request, *args, **kwargs):
-        print("\n" + "🔥"*40)
-        print("🔍 ENTRANDO A UPDATE")
-        print(f"request.data keys: {list(request.data.keys())}")
-        print("🔥"*40 + "\n")
         
         try:
             response = super().update(request, *args, **kwargs)
-            print("\n✅ UPDATE EXITOSO\n")
             return response
         except Exception as e:
-            print("\n" + "❌"*40)
-            print(f"ERROR EN UPDATE: {type(e).__name__}")
-            print(f"Mensaje: {str(e)}")
-            if hasattr(e, 'detail'):
-                print(f"Detail: {e.detail}")
             import traceback
-            print(f"Traceback:\n{traceback.format_exc()}")
-            print("❌"*40 + "\n")
+            traceback.print_exc()
             raise
     # ================================
 

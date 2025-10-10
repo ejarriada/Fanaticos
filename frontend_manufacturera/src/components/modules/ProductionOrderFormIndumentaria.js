@@ -174,9 +174,15 @@ const ProductionOrderFormIndumentaria = ({ open, onClose, onSave, order, creatio
     const handleSave = () => {
         const data = new FormData();
         
+        // ===== ASEGURAR QUE customization_details sea un objeto válido =====
+        const customizationDetails = formData.customization_details || {};
+        
         Object.keys(formData).forEach(key => {
-            if (key === 'items' || key === 'customization_details') {
-                data.append(key, JSON.stringify(formData[key]));
+            if (key === 'items') {
+                data.append(key, JSON.stringify(formData[key] || []));
+            } else if (key === 'customization_details') {
+                // Siempre enviar como objeto JSON, aunque esté vacío
+                data.append(key, JSON.stringify(customizationDetails));
             } else if (formData[key] !== null && formData[key] !== undefined && formData[key] !== '') {
                 data.append(key, formData[key]);
             }

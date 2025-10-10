@@ -483,22 +483,26 @@ class ProcessSerializer(TenantAwareSerializer):
         model = Process
         fields = '__all__'
 
-# FINAL FIX: Use a plain Serializer for the nested items to avoid ModelSerializer validation issues
 class ProductionOrderItemSerializer(serializers.Serializer):
+    """Serializer simple para items de órdenes de producción"""
+    id = serializers.IntegerField(required=False)
     product = serializers.IntegerField()
     quantity = serializers.IntegerField()
     size = serializers.CharField(max_length=50)
+    color = serializers.CharField(max_length=50, allow_blank=True, required=False)
     detail = serializers.CharField(max_length=255, allow_blank=True, required=False)
+    customizations = serializers.JSONField(default=dict, required=False)
 
     def to_representation(self, instance):
-        # to_representation is used for READ operations, we can keep it simple
-        # or use the ModelSerializer for reading if needed elsewhere.
+        """Para READ operations - devuelve datos anidados"""
         return {
             'id': instance.id,
             'product': SimpleProductSerializer(instance.product).data,
             'quantity': instance.quantity,
             'size': instance.size,
+            'color': instance.color,
             'detail': instance.detail,
+            'customizations': instance.customizations
         }
 
 class ProductionOrderFileSerializer(TenantAwareSerializer):
@@ -515,7 +519,7 @@ class ProductionOrderBaseSerializer(TenantAwareSerializer):
     Serializer base que contiene la configuración y campos comunes para todas
     las operaciones de Órdenes de Producción.
     """
-    items = ProductionOrderItemSerializer(many=True, required=False)
+    items = ProductionOrderItemSerializer(many=True, required=False, allow_null=True)  # ← AGREGAR allow_null=True
     files = ProductionOrderFileSerializer(many=True, read_only=True)
     colors = ColorSerializer(many=True, read_only=True)
     color_ids = serializers.PrimaryKeyRelatedField(
@@ -565,7 +569,6 @@ class ProductionOrderBaseSerializer(TenantAwareSerializer):
 
     def _create_or_update_files(self, production_order, files_data):
         """Helper para manejar la subida de archivos."""
-        # Esta lógica puede ser más compleja, por ahora es un placeholder
         pass
 
 class ProductionOrderReadOnlySerializer(ProductionOrderBaseSerializer):
@@ -576,14 +579,33 @@ class ProductionOrderReadOnlySerializer(ProductionOrderBaseSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         
+        # ===== SERIALIZAR ORDER NOTE =====
         order_note_instance = instance.order_note
-        base_product_instance = instance.base_product
-
         if order_note_instance:
             representation['order_note'] = OrderNoteSerializer(order_note_instance, context=self.context).data
+        
+        # ===== SERIALIZAR BASE PRODUCT =====
+        base_product_instance = instance.base_product
         if base_product_instance:
             representation['base_product'] = SimpleProductSerializer(base_product_instance, context=self.context).data
-            
+        
+        # ===== SERIALIZAR ITEMS CORRECTAMENTE =====
+        items = instance.items.all()
+        
+        items_data = []
+        for item in items:
+            items_data.append({
+                'id': item.id,
+                'product': item.product_id,
+                'quantity': item.quantity,
+                'size': item.size,
+                'detail': item.detail,
+                'color': item.color,
+                'customizations': item.customizations
+            })
+        
+        representation['items'] = items_data
+        
         return representation
 
 class ProductionOrderIndumentariaSerializer(ProductionOrderBaseSerializer):
@@ -592,20 +614,79 @@ class ProductionOrderIndumentariaSerializer(ProductionOrderBaseSerializer):
     """
     def to_internal_value(self, data):
         mutable_data = data.copy()
-        if 'customization_details' in mutable_data and isinstance(mutable_data.get('customization_details'), str):
-            try:
-                mutable_data['customization_details'] = json.loads(mutable_data['customization_details'])
-            except (json.JSONDecodeError, TypeError):
-                raise serializers.ValidationError({'customization_details': "Invalid JSON format."})
-        return super().to_internal_value(mutable_data)
+        
+        # ===== EXTRAER customization_details ANTES DE LA VALIDACIÓN =====
+        customization_raw = None
+        if 'customization_details' in mutable_data:
+            custom_value = mutable_data.get('customization_details')
+            
+            # Si es un string JSON, parsearlo
+            if isinstance(custom_value, str):
+                try:
+                    customization_raw = json.loads(custom_value) if custom_value else {}
+                except (json.JSONDecodeError, TypeError):
+                    raise serializers.ValidationError({'customization_details': "Invalid JSON format."})
+            # Si ya es un dict, usarlo directamente
+            elif isinstance(custom_value, dict):
+                customization_raw = custom_value
+            # Si está vacío
+            elif custom_value is None or custom_value == '':
+                customization_raw = {}
+            
+            # REMOVER de mutable_data para evitar validación
+            del mutable_data['customization_details']
+        
+        # ===== EXTRAER ITEMS ANTES DE LA VALIDACIÓN =====
+        items_raw = None
+        if 'items' in mutable_data:
+            items_value = mutable_data.get('items')
+            
+            if isinstance(items_value, list) and len(items_value) == 1 and isinstance(items_value[0], str):
+                try:
+                    items_raw = json.loads(items_value[0]) if items_value[0] else []
+                except (json.JSONDecodeError, TypeError):
+                    raise serializers.ValidationError({'items': "Invalid JSON format."})
+            elif isinstance(items_value, str):
+                try:
+                    items_raw = json.loads(items_value) if items_value else []
+                except (json.JSONDecodeError, TypeError):
+                    raise serializers.ValidationError({'items': "Invalid JSON format."})
+            elif isinstance(items_value, list):
+                items_raw = items_value
+            
+            del mutable_data['items']
+        
+        # Llamar a super() sin items ni customization_details
+        validated_data = super().to_internal_value(mutable_data)
+        
+        # ===== AGREGAR MANUALMENTE =====
+        if items_raw is not None:
+            validated_data['items'] = items_raw
+        
+        if customization_raw is not None:
+            validated_data['customization_details'] = customization_raw
+        
+        return validated_data
 
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
         colors_data = validated_data.pop('colors', [])
         
-        production_order = ProductionOrder.objects.create(**validated_data)
-        production_order.colors.set(colors_data)
-        self._create_or_update_items(production_order, items_data)
+        with transaction.atomic():
+            production_order = ProductionOrder.objects.create(**validated_data)
+            production_order.colors.set(colors_data)
+            
+            for item_data in items_data:
+                ProductionOrderItem.objects.create(
+                    production_order=production_order,
+                    tenant=production_order.tenant,
+                    product_id=item_data.get('product'),
+                    quantity=item_data.get('quantity'),
+                    size=str(item_data.get('size', '')),
+                    color=item_data.get('color', ''),
+                    detail=item_data.get('detail', ''),
+                    customizations=item_data.get('customizations', {})
+                )
         
         return production_order
 
@@ -613,7 +694,6 @@ class ProductionOrderIndumentariaSerializer(ProductionOrderBaseSerializer):
         items_data = validated_data.pop('items', None)
         colors_data = validated_data.pop('colors', None)
 
-        # Actualizar campos escalares
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
@@ -621,7 +701,20 @@ class ProductionOrderIndumentariaSerializer(ProductionOrderBaseSerializer):
         if colors_data is not None:
             instance.colors.set(colors_data)
         
-        self._create_or_update_items(instance, items_data)
+        if items_data is not None:
+            instance.items.all().delete()
+            
+            for item_data in items_data:
+                ProductionOrderItem.objects.create(
+                    production_order=instance,
+                    tenant=instance.tenant,
+                    product_id=item_data.get('product'),
+                    quantity=item_data.get('quantity'),
+                    size=str(item_data.get('size', '')),
+                    color=item_data.get('color', ''),
+                    detail=item_data.get('detail', ''),
+                    customizations=item_data.get('customizations', {})
+                )
         
         return instance
 
@@ -632,36 +725,75 @@ class ProductionOrderMediasSerializer(ProductionOrderBaseSerializer):
     def to_internal_value(self, data):
         mutable_data = data.copy()
         
-        # Decodificar 'items' que llega como una lista -> ['[{"size":...}]']
+        # ===== EXTRAER ITEMS ANTES DE LA VALIDACIÓN =====
+        items_raw = None
         if 'items' in mutable_data:
             items_value = mutable_data.get('items')
+            
+            # Si es una lista con un string JSON, parsearlo
             if isinstance(items_value, list) and len(items_value) == 1 and isinstance(items_value[0], str):
                 try:
                     items_str = items_value[0]
-                    mutable_data['items'] = json.loads(items_str) if items_str else []
-                except (json.JSONDecodeError, TypeError):
+                    items_raw = json.loads(items_str) if items_str else []
+                except (json.JSONDecodeError, TypeError) as e:
                     raise serializers.ValidationError({'items': "Invalid JSON format."})
-
+            # Si es un string JSON directamente, parsearlo
+            elif isinstance(items_value, str):
+                try:
+                    items_raw = json.loads(items_value) if items_value else []
+                except (json.JSONDecodeError, TypeError) as e:
+                    raise serializers.ValidationError({'items': "Invalid JSON format."})
+            # Si ya es una lista, dejarla tal cual
+            elif isinstance(items_value, list):
+                items_raw = items_value
+            
+            # REMOVER items de mutable_data para que no interfiera con la validación
+            del mutable_data['items']
+            
         # Validar 'specifications' si es un string JSON
         if 'specifications' in mutable_data and isinstance(mutable_data.get('specifications'), str):
             try:
                 json.loads(mutable_data['specifications'])
             except (json.JSONDecodeError, TypeError):
                 raise serializers.ValidationError({'specifications': "Invalid JSON format for specifications."})
-
-        return super().to_internal_value(mutable_data)
+       
+        # Llamar a super() sin items
+        validated_data = super().to_internal_value(mutable_data)
+        
+        # ===== AGREGAR ITEMS MANUALMENTE A validated_data =====
+        if items_raw is not None:
+            validated_data['items'] = items_raw
+        
+        return validated_data
 
     def create(self, validated_data):
+        
         items_data = validated_data.pop('items', [])
         colors_data = validated_data.pop('colors', [])
         
-        production_order = ProductionOrder.objects.create(**validated_data)
-        production_order.colors.set(colors_data)
-        self._create_or_update_items(production_order, items_data)
-        
+        with transaction.atomic():
+            production_order = ProductionOrder.objects.create(**validated_data)
+            
+            production_order.colors.set(colors_data)
+            
+            # CREAR ITEMS
+            for idx, item_data in enumerate(items_data):
+                
+                item = ProductionOrderItem.objects.create(
+                    production_order=production_order,
+                    tenant=production_order.tenant,
+                    product_id=item_data.get('product'),
+                    quantity=item_data.get('quantity'),
+                    size=str(item_data.get('size', '')),
+                    color=item_data.get('color', ''),
+                    detail=item_data.get('detail', ''),
+                    customizations=item_data.get('customizations', {})
+                )
+
         return production_order
 
     def update(self, instance, validated_data):
+        
         items_data = validated_data.pop('items', None)
         colors_data = validated_data.pop('colors', None)
 
@@ -673,11 +805,26 @@ class ProductionOrderMediasSerializer(ProductionOrderBaseSerializer):
         if colors_data is not None:
             instance.colors.set(colors_data)
         
-        self._create_or_update_items(instance, items_data)
+        # ACTUALIZAR ITEMS
+        if items_data is not None:
+            # Eliminar items existentes
+            deleted_count = instance.items.all().delete()[0]
+            
+            # Crear nuevos items
+            for idx, item_data in enumerate(items_data):
+                
+                item = ProductionOrderItem.objects.create(
+                    production_order=instance,
+                    tenant=instance.tenant,
+                    product_id=item_data.get('product'),
+                    quantity=item_data.get('quantity'),
+                    size=str(item_data.get('size', '')),
+                    color=item_data.get('color', ''),
+                    detail=item_data.get('detail', ''),
+                    customizations=item_data.get('customizations', {})
+                )
         
         return instance
-
-# ==============================================================================
 
 class ProductionProcessLogSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):
