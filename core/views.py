@@ -237,11 +237,20 @@ class ProductionOrderViewSet(TenantAwareViewSet):
     def generate_qr_code(self, request, pk=None):
         production_order = self.get_object()
         
+        # ===== DATOS PERSONALIZADOS PARA EL QR =====
+        base_product_name = production_order.base_product.name if production_order.base_product else 'Sin producto base'
+        estimated_delivery = production_order.estimated_delivery_date.strftime('%d/%m/%Y') if production_order.estimated_delivery_date else 'No definida'
+        
         qr_data_str = (
-            f"OP ID: {production_order.id}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"  ORDEN DE PRODUCCIÓN\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"ID: #{production_order.id}\n"
             f"Tipo: {production_order.op_type}\n"
-            f"Producto Base: {production_order.base_product.name if production_order.base_product else 'N/A'}\n"
-            f"Estado: {production_order.status}"
+            f"Producto: {base_product_name}\n"
+            f"Entrega estimada: {estimated_delivery}\n"
+            f"Estado: {production_order.status}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━"
         )
 
         qr = qrcode.QRCode(
