@@ -1166,9 +1166,9 @@ class EmployeeRoleSerializer(TenantAwareSerializer):
         fields = '__all__'
 
 class EmployeeSerializer(TenantAwareSerializer):
-    user_email = serializers.EmailField(source='user.email', read_only=True)
-    factory_name = serializers.CharField(source='factory.name', read_only=True)
-    role_name = serializers.CharField(source='role.name', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True, allow_null=True)
+    factory_name = serializers.CharField(source='factory.name', read_only=True, allow_null=True)
+    role_name = serializers.CharField(source='role.name', read_only=True, allow_null=True)
     
     class Meta(TenantAwareSerializer.Meta):
         model = Employee
@@ -1178,6 +1178,7 @@ class EmployeeSerializer(TenantAwareSerializer):
             'user', 'user_email', 'factory', 'factory_name', 
             'role', 'role_name', 'hire_date'
         ]
+        read_only_fields = ['user_email', 'factory_name', 'role_name']
 
 class SalarySerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):

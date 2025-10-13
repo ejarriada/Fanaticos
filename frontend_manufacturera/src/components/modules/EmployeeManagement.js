@@ -140,17 +140,28 @@ const EmployeeForm = ({ open, onClose, onSave, employee }) => {
     }, [tenantId]);
 
     useEffect(() => {
+        const getSafeId = (field) => (field && typeof field === 'object' ? field.id : field) || '';
+
         if (employee) {
+            // Explicitly map fields to avoid spreading read-only properties into form state
             setFormData({
-                ...employee,
-                hire_date: employee.hire_date ? new Date(employee.hire_date).toISOString().split('T')[0] : '',
+                id: employee.id,
+                first_name: employee.first_name || '',
+                last_name: employee.last_name || '',
+                dni: employee.dni || '',
+                cuil: employee.cuil || '',
                 birth_date: employee.birth_date ? new Date(employee.birth_date).toISOString().split('T')[0] : '',
-                user: employee.user?.id || '',
-                factory: employee.factory?.id || '',
-                role: employee.role?.id || '',
+                address: employee.address || '',
+                phone: employee.phone || '',
                 dependents: employee.dependents || [],
+                observations: employee.observations || '',
+                hire_date: employee.hire_date ? new Date(employee.hire_date).toISOString().split('T')[0] : '',
+                user: getSafeId(employee.user),
+                factory: getSafeId(employee.factory),
+                role: getSafeId(employee.role),
             });
         } else {
+            // Reset form for new employee
             setFormData({
                 first_name: '',
                 last_name: '',
