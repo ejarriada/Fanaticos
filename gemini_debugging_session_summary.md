@@ -1,29 +1,47 @@
-# Resumen de la Sesión de Depuración con Gemini
+# Resumen de Sesión de Depuración: Creación de Remitos
 
-**Fecha:** 2025-10-07
+## Problema Inicial
+El usuario reportó que la creación de un **Remito** (`DeliveryNote`) fallaba, inicialmente con un error 500 en el backend.
 
-## Problema Reportado
+## Proceso de Depuración y Soluciones Aplicadas
 
-El usuario reportó un bug crítico en el módulo de producción: al crear o editar una **Orden de Producción (OP) para "Medias"**, los datos no se guardaban correctamente, o desaparecían al intentar editarlos. La funcionalidad para OPs de "Indumentaria" funcionaba sin problemas, sirviendo como punto de comparación.
+La resolución de este problema requirió una depuración profunda a través de múltiples capas de la aplicación, descubriendo una cascada de errores:
 
-## Proceso de Diagnóstico
+1.  **Error 1 (500 - `OperationalError`):** `no such column: core_deliverynote.tipo`.
+    *   **Causa:** El modelo `DeliveryNote` en `models.py` había sido modificado, pero las migraciones no se habían creado ni aplicado.
+    *   **Solución:** Se intentó crear la migración, pero falló secuencialmente debido a nuevos campos no nulables sin valor por defecto (`created_at`, `fecha`, `origen`). Se corrigió el modelo para añadir valores por defecto o permitir nulos y se ejecutaron `makemigrations` y `migrate` con éxito.
 
-1.  **Hipótesis Inicial:** Dado que la creación de "Indumentaria" funcionaba, el problema probablemente residía en una lógica condicional o en un manejo de datos específico para el tipo "Medias" en el backend.
+2.  **Error 2 (400 - `Bad Request`):** `Invalid pk "3" - object does not exist` en el campo `destino`.
+    *   **Causa:** Se descubrió que el formulario del frontend (`NuevoRemitoForm.js`) enviaba incorrectamente el ID del **Cliente** en el campo `destino` cuando el tipo de remito era "Venta".
+    *   **Solución:** Se modificó la función `handleSubmit` en el frontend para enviar `destino: null` cuando el tipo es "Venta", lo cual es la lógica correcta según el modelo del backend.
 
-2.  **Análisis del Backend:** Se procedió a analizar el archivo `core/serializers.py`, ya que los serializadores son responsables de la validación, conversión y guardado de los datos que llegan desde el frontend.
+3.  **Error 3 (500 - `NameError`):** `name 'serializers' is not defined`.
+    *   **Causa:** El archivo `core/views.py` intentaba lanzar una `ValidationError` sin haber importado el módulo `serializers` de DRF.
+    *   **Solución:** Se añadió `from rest_framework import serializers` al archivo `core/views.py`.
 
-3.  **Identificación de la Causa Raíz:** La revisión del `ProductionOrderSerializer` reveló dos problemas principales:
-    *   **Manejo de Datos Incorrecto:** En el método `to_internal_value`, había bloques de código que intentaban parsear los campos `colors` y `specifications` como si fueran cadenas JSON. Esta lógica era incorrecta para la estructura de datos actual y causaba un fallo silencioso que impedía el procesamiento adecuado de las OPs de "Medias".
-    *   **Método `update` Incompleto:** El método `update` del serializador, que se invoca al editar un objeto existente, carecía de la lógica para guardar los cambios en los campos `model`, `specifications` y, crucialmente, la relación `colors`. Esto explica por qué los datos "desaparecían" al editar.
+4.  **Error 4 (500 - Lógica de Negocio):** El `NameError` anterior ocultaba una `ValidationError` con el mensaje "Se requiere especificar una venta".
+    *   **Causa:** El método `perform_create` buscaba la venta asociada con la clave incorrecta: `validated_data.get('sale')` en lugar de `validated_data.get('venta_asociada')`.
+    *   **Solución:** Se corrigió el nombre del campo a `venta_asociada` en `core/views.py`.
 
-## Solución Implementada
+5.  **Error 5 (500 - `ValueError`):** `Cannot query "Venta #3 ...": Must be "DeliveryNote" instance`.
+    *   **Causa:** Al calcular las cantidades ya entregadas, la consulta al ORM usaba un nombre de campo incorrecto en el filtro: `delivery_note__sale` en lugar de `delivery_note__venta_asociada`.
+    *   **Solución:** Se corrigió la consulta en `core/views.py`.
 
-Se realizaron dos modificaciones atómicas en `core/serializers.py`:
+6.  **Error 6 (500 - `FieldError`):** `Cannot resolve keyword 'local' into field`.
+    *   **Causa:** El código intentaba consultar el modelo `Inventory` usando el campo `local`, cuando el nombre correcto del campo es `warehouse`.
+    *   **Solución:** Se reemplazaron dos ocurrencias de `local=...` por `warehouse=...` en `core/views.py`.
 
-1.  **Limpieza del Método `to_internal_value`:** Se eliminaron los bloques de código que realizaban el `json.loads` sobre los campos `colors` y `specifications`, permitiendo que el proceso de validación estándar del serializador se encargue de ellos correctamente.
+7.  **Error 7 (ERR_NETWORK - `IndentationError`):** El servidor del backend dejó de responder.
+    *   **Causa:** Una de las correcciones anteriores, realizada con la herramienta `replace`, introdujo un error de sintaxis (indentación incorrecta) en `core/views.py`, impidiendo que el servidor se iniciara.
+    *   **Solución:** Se reemplazó el método `perform_create` completo con una versión íntegra que contenía todas las correcciones y la sintaxis correcta.
 
-2.  **Completado del Método `update`:** Se añadió la lógica necesaria al método `update` para que asigne y guarde los valores de los campos `model`, `specifications` y la relación `colors` en la instancia de la base de datos.
+8.  **Error 8 (500 - `ValueError`):** `Cannot query "Fábrica...": Must be "Warehouse" instance`.
+    *   **Causa:** Se descubrió un error de lógica fundamental. El código ignoraba el almacén de "Origen" seleccionado y hardcodeaba la búsqueda de stock en un `Local` llamado "Fábrica", confundiendo el modelo `Local` con el modelo `Warehouse`.
+    *   **Solución:** Se reescribió la lógica de `perform_create` para eliminar la creación del `Local` "Fábrica" y en su lugar usar el `origen_warehouse` (el almacén de origen seleccionado en el formulario) para todas las operaciones de consulta y descuento de stock.
 
-## Resultado
+9.  **Estado Final (400 - `Bad Request`):** `"No hay registro de inventario..."`.
+    *   **Causa:** El código ahora funciona correctamente y lanza una validación de negocio porque no hay datos de stock para el producto en el almacén seleccionado.
+    *   **Conclusión:** El ciclo de depuración de código ha finalizado con éxito. El problema restante es un asunto de datos que el usuario debe resolver desde la propia aplicación.
 
-Con las correcciones aplicadas, el bug fue resuelto. La creación y edición de Órdenes de Producción para "Medias" ahora funciona de manera correcta y persistente, igualando la funcionalidad de las órdenes de "Indumentaria".
+## Conclusión de la Sesión
+La funcionalidad de creación de remitos ha sido reparada exitosamente después de una intensa y profunda sesión de depuración que abarcó desde la base de datos hasta la lógica de negocio del backend y el frontend. El sistema ahora es más robusto y proporciona validaciones correctas.

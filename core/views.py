@@ -1,6 +1,7 @@
 import datetime
 import json
 from django.utils import timezone
+from rest_framework import serializers
 import uuid
 import qrcode
 import base64
@@ -995,77 +996,49 @@ class DeliveryNoteViewSet(TenantAwareViewSet):
 
     def perform_create(self, serializer):
         with transaction.atomic():
-            # Get or create factory local
-            factory_local, created = Local.objects.get_or_create(
-                name='Fábrica',
-                tenant=self.get_tenant()
-            )
-            
+            # Get the origin warehouse from the validated data. This is where stock will be deducted from.
+            origen_warehouse = serializer.validated_data.get('origen')
+            if not origen_warehouse:
+                raise serializers.ValidationError({"origen": "Se requiere un almacén de origen."})
+
             # Get the sale from validated_data to validate quantities
-            sale = serializer.validated_data.get('sale')
-            
+            sale = serializer.validated_data.get('venta_asociada')
             if not sale:
-                raise serializers.ValidationError("Se requiere especificar una venta.")
-            
+                raise serializers.ValidationError({"venta_asociada": "Se requiere especificar una venta."})
+
             # Validate each item
             for item_data in serializer.validated_data['items']:
                 product = item_data['product']
                 quantity_to_deduct = item_data['quantity']
-                
+
                 # NUEVA VALIDACIÓN: Verificar que no se exceda la cantidad vendida
-                # Cantidad total vendida de este producto en esta venta
-                sold_quantity = SaleItem.objects.filter(
-                    sale=sale, 
-                    product=product,
-                    tenant=self.get_tenant()
-                ).aggregate(total=Sum('quantity'))['total'] or 0
-                
+                sold_quantity = SaleItem.objects.filter(sale=sale, product=product, tenant=self.get_tenant()).aggregate(total=Sum('quantity'))['total'] or 0
                 if sold_quantity == 0:
-                    raise serializers.ValidationError(
-                        f"El producto '{product.name}' no está en la venta."
-                    )
+                    raise serializers.ValidationError(f"El producto '{product.name}' no está en la venta.")
                 
-                # Cantidad ya entregada en remitos anteriores
-                delivered_quantity = DeliveryNoteItem.objects.filter(
-                    delivery_note__sale=sale,
-                    product=product,
-                    delivery_note__tenant=self.get_tenant()
-                ).aggregate(total=Sum('quantity'))['total'] or 0
-                
-                # Calcular lo que queda por entregar
+                delivered_quantity = DeliveryNoteItem.objects.filter(delivery_note__venta_asociada=sale, product=product, delivery_note__tenant=self.get_tenant()).aggregate(total=Sum('quantity'))['total'] or 0
                 remaining_quantity = sold_quantity - delivered_quantity
-                
-                # Validar que no se exceda
                 if quantity_to_deduct > remaining_quantity:
-                    raise serializers.ValidationError(
-                        f"Producto '{product.name}': "
-                        f"Cantidad a entregar ({quantity_to_deduct}) excede lo pendiente ({remaining_quantity}). "
-                        f"Vendido: {sold_quantity}, Ya entregado: {delivered_quantity}"
-                    )
-                
-                # VALIDACIÓN ORIGINAL: Verificar stock disponible
+                    raise serializers.ValidationError(f"Producto '{product.name}': Cantidad a entregar ({quantity_to_deduct}) excede lo pendiente ({remaining_quantity}). Vendido: {sold_quantity}, Ya entregado: {delivered_quantity}")
+
+                # Check for available stock in the ORIGIN warehouse
                 try:
                     inventory_item = Inventory.objects.get(
                         product=product,
-                        local=factory_local,
+                        warehouse=origen_warehouse,
                         tenant=self.get_tenant()
                     )
                     if inventory_item.quantity < quantity_to_deduct:
-                        raise serializers.ValidationError(
-                            f"Stock insuficiente para el producto {product.name}. "
-                            f"Requerido: {quantity_to_deduct}, Disponible: {inventory_item.quantity}."
-                        )
+                        raise serializers.ValidationError(f"Stock insuficiente para el producto {product.name} en el almacén de origen. Requerido: {quantity_to_deduct}, Disponible: {inventory_item.quantity}.")
                 except Inventory.DoesNotExist:
-                    raise serializers.ValidationError(
-                        f"No hay registro de inventario para el producto {product.name} en la Fábrica."
-                    )
-            
+                    raise serializers.ValidationError(f"No hay registro de inventario para el producto {product.name} en el almacén de origen.")
+
             # If all validations pass, proceed to create the delivery note and deduct stock.
             delivery_note = serializer.save(tenant=self.get_tenant())
             for item in delivery_note.items.all():
                 inventory_item = Inventory.objects.get(
                     product=item.product,
-                    local=factory_local,
+                    warehouse=origen_warehouse, # Deduct from the origin warehouse
                     tenant=self.get_tenant()
                 )
                 inventory_item.quantity -= item.quantity

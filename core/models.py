@@ -289,15 +289,56 @@ class SaleItem(TenantAwareModel):
         return f"{self.quantity} x [Producto no disponible] en Venta #{self.sale.id}"
 
 class DeliveryNote(TenantAwareModel):
-    """ Modelo para Remitos de entrega de mercadería. """
-    sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='delivery_notes')
-    date = models.DateField(auto_now_add=True)
-    status = models.CharField(max_length=50, default='Pendiente', choices=[('Pendiente', 'Pendiente'), ('Enviado', 'Enviado'), ('Entregado', 'Entregado')])
+    """ Modelo para Remitos de entrega de mercadería y movimientos internos. """
+    TIPO_CHOICES = [
+        ('Venta', 'Venta'),
+        ('Interno', 'Interno'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('Pendiente', 'Pendiente'),
+        ('En Proceso', 'En Proceso'),
+        ('Enviado', 'Enviado'),
+        ('Entregado', 'Entregado'),
+        ('Cancelado', 'Cancelado'),
+    ]
+    
+    # Campos principales
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='Venta')
+    fecha = models.DateField(help_text="Fecha del remito", default=timezone.now)
+    
+    # Para remitos de venta
+    cliente = models.ForeignKey(Client, on_delete=models.SET_NULL, null=True, blank=True, 
+                                help_text="Cliente para remitos de venta")
+    venta_asociada = models.ForeignKey(Sale, on_delete=models.SET_NULL, null=True, blank=True,
+                                       related_name='remitos',
+                                       help_text="Venta asociada (opcional)")
+    
+    # Almacenes (origen y destino)
+    origen = models.ForeignKey(Warehouse, on_delete=models.PROTECT, 
+                               related_name='remitos_salida',
+                               help_text="Almacén de origen", null=True)
+    destino = models.ForeignKey(Warehouse, on_delete=models.SET_NULL, 
+                                null=True, blank=True,
+                                related_name='remitos_entrada',
+                                help_text="Almacén de destino (para remitos internos)")
+    
+    # Campos adicionales
+    observaciones = models.TextField(blank=True, null=True)
+    estado = models.CharField(max_length=50, default='Pendiente', choices=STATUS_CHOICES)
     tracking_number = models.CharField(max_length=100, blank=True, null=True)
-    notes = models.TextField(blank=True, null=True)
+    
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Remito #{self.id} para Venta #{self.sale.id}"
+        if self.tipo == 'Venta':
+            return f"Remito #{self.id} - Venta a {self.cliente.name if self.cliente else 'N/A'}"
+        else:
+            return f"Remito #{self.id} - Interno: {self.origen.name} → {self.destino.name if self.destino else 'N/A'}"
+
+    class Meta:
+        ordering = ['-fecha', '-id']
 
 class DeliveryNoteItem(TenantAwareModel):
     delivery_note = models.ForeignKey(DeliveryNote, on_delete=models.CASCADE, related_name='items')

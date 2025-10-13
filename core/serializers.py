@@ -463,15 +463,117 @@ class ProductSerializer(TenantAwareSerializer):
         return instance
 
 class DeliveryNoteItemSerializer(TenantAwareSerializer):
+    product = SimpleProductSerializer(read_only=True)
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(),
+        source='product',
+        write_only=True
+    )
+    
     class Meta(TenantAwareSerializer.Meta):
         model = DeliveryNoteItem
-        fields = '__all__'
+        fields = ['id', 'product', 'product_id', 'quantity']
 
 class DeliveryNoteSerializer(TenantAwareSerializer):
     items = DeliveryNoteItemSerializer(many=True)
+    
+    # Read-only nested objects
+    cliente_detalle = ClientSerializer(source='cliente', read_only=True)
+    origen_detalle = WarehouseSerializer(source='origen', read_only=True)
+    destino_detalle = WarehouseSerializer(source='destino', read_only=True)
+    venta_asociada_detalle = serializers.SerializerMethodField()
+    
+    # Write-only IDs
+    cliente = serializers.PrimaryKeyRelatedField(
+        queryset=Client.objects.all(),
+        required=False,
+        allow_null=True
+    )
+    venta_asociada = serializers.PrimaryKeyRelatedField(
+        queryset=Sale.objects.all(),
+        required=False,
+        allow_null=True
+    )
+    origen = serializers.PrimaryKeyRelatedField(
+        queryset=Warehouse.objects.all(),
+        required=True
+    )
+    destino = serializers.PrimaryKeyRelatedField(
+        queryset=Warehouse.objects.all(),
+        required=False,
+        allow_null=True
+    )
+    
     class Meta(TenantAwareSerializer.Meta):
         model = DeliveryNote
-        fields = '__all__'
+        fields = [
+            'id', 'tipo', 'fecha', 'cliente', 'cliente_detalle',
+            'venta_asociada', 'venta_asociada_detalle',
+            'origen', 'origen_detalle', 'destino', 'destino_detalle',
+            'observaciones', 'estado', 'tracking_number',
+            'items', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def get_venta_asociada_detalle(self, obj):
+        if obj.venta_asociada:
+            return {
+                'id': obj.venta_asociada.id,
+                'total_amount': obj.venta_asociada.total_amount,
+                'sale_date': obj.venta_asociada.sale_date
+            }
+        return None
+    
+    def validate(self, data):
+        # Validar que remitos de venta tengan cliente
+        if data.get('tipo') == 'Venta' and not data.get('cliente'):
+            raise serializers.ValidationError({
+                'cliente': 'Los remitos de venta deben tener un cliente asociado.'
+            })
+        
+        # Validar que remitos internos tengan destino
+        if data.get('tipo') == 'Interno' and not data.get('destino'):
+            raise serializers.ValidationError({
+                'destino': 'Los remitos internos deben tener un almacén de destino.'
+            })
+        
+        return data
+    
+    def create(self, validated_data):
+        items_data = validated_data.pop('items', [])
+        
+        with transaction.atomic():
+            delivery_note = DeliveryNote.objects.create(**validated_data)
+            
+            for item_data in items_data:
+                DeliveryNoteItem.objects.create(
+                    delivery_note=delivery_note,
+                    tenant=delivery_note.tenant,
+                    **item_data
+                )
+        
+        return delivery_note
+    
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', None)
+        
+        # Actualizar campos del remito
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Actualizar items si se proporcionan
+        if items_data is not None:
+            with transaction.atomic():
+                instance.items.all().delete()
+                for item_data in items_data:
+                    DeliveryNoteItem.objects.create(
+                        delivery_note=instance,
+                        tenant=instance.tenant,
+                        **item_data
+                    )
+        
+        return instance
 
 class ProductFileSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):

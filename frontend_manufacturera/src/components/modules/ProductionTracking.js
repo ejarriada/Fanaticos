@@ -192,33 +192,61 @@ const ProductionTracking = () => {
 
     const renderMediasSpecifications = (colors, specifications) => {
         if (!colors && !specifications) return null;
+        
+        // Parsear specifications si es un string JSON
+        let parsedSpecs = specifications;
+        if (typeof specifications === 'string') {
+            try {
+                parsedSpecs = JSON.parse(specifications);
+            } catch (e) {
+                parsedSpecs = {};
+            }
+        }
+        
         return (
             <Box sx={{ mt: 2 }}>
                 <Grid container spacing={2}>
-                    {colors && Object.keys(colors).length > 0 && (
+                    {colors && colors.length > 0 && (
                         <Grid item xs={12} md={6}>
                             <Card>
                                 <CardContent>
                                     <Typography variant="h6" gutterBottom>Colores</Typography>
-                                    {Object.entries(colors).filter(([key, value]) => value).map(([key, value]) => (
-                                        <Typography key={key} sx={{ mb: 0.5 }}>
-                                            <strong>{key.charAt(0).toUpperCase() + key.slice(1)}:</strong> {value}
-                                        </Typography>
+                                    {colors.map((color, index) => (
+                                        <Box key={index} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Box
+                                                sx={{
+                                                    width: 24,
+                                                    height: 24,
+                                                    borderRadius: '50%',
+                                                    backgroundColor: color.hex_code || '#ccc',
+                                                    border: '1px solid #ddd'
+                                                }}
+                                            />
+                                            <Typography>
+                                                <strong>{color.name}</strong>
+                                            </Typography>
+                                        </Box>
                                     ))}
                                 </CardContent>
                             </Card>
                         </Grid>
                     )}
-                    {specifications && Object.keys(specifications).length > 0 && (
+                    {parsedSpecs && Object.keys(parsedSpecs).length > 0 && (
                         <Grid item xs={12} md={6}>
                             <Card>
                                 <CardContent>
                                     <Typography variant="h6" gutterBottom>Especificaciones Técnicas</Typography>
-                                    {Object.entries(specifications).filter(([key, value]) => value).map(([key, value]) => (
-                                        <Typography key={key} sx={{ mb: 0.5 }}>
-                                            <strong>{key.charAt(0).toUpperCase() + key.slice(1)}:</strong> {value}
-                                        </Typography>
-                                    ))}
+                                    {Object.entries(parsedSpecs)
+                                        .filter(([key, value]) => {
+                                            // Filtrar colores que ya se guardaron en specifications
+                                            return !key.startsWith('color_') && value;
+                                        })
+                                        .map(([key, value]) => (
+                                            <Typography key={key} sx={{ mb: 0.5 }}>
+                                                <strong>{key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')}:</strong> {value}
+                                            </Typography>
+                                        ))
+                                    }
                                 </CardContent>
                             </Card>
                         </Grid>

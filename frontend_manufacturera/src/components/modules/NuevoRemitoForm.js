@@ -43,26 +43,17 @@ const NuevoRemitoForm = () => {
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
-                const [clientesData, productosData, ventasData] = await Promise.all([
+                const [clientesData, productosData, ventasData, almacenesData] = await Promise.all([
                     api.list('/clients/'),
                     api.list('/products/'),
-                    api.list('/sales/')
+                    api.list('/sales/'),
+                    api.list('/warehouses/')  // ← Cargar almacenes reales
                 ]);
                 
                 setClientes(clientesData.results || clientesData || []);
                 setProductos(productosData.results || productosData || []);
                 setVentas(ventasData.results || ventasData || []);
-                
-                // TODO: Cargar almacenes cuando esté disponible el endpoint
-                // const almacenesData = await api.list('/warehouses/');
-                // setAlmacenes(almacenesData.results || almacenesData || []);
-                
-                // Mock de almacenes por ahora
-                setAlmacenes([
-                    { id: 1, name: 'Almacén Central' },
-                    { id: 2, name: 'Almacén Fábrica' },
-                    { id: 3, name: 'Almacén Norte' }
-                ]);
+                setAlmacenes(almacenesData.results || almacenesData || []);  // ← Usar almacenes reales
                 
             } catch (err) {
                 setError('Error al cargar los datos iniciales.');
@@ -185,16 +176,18 @@ const NuevoRemitoForm = () => {
                 tipo: formData.tipo,
                 fecha: formData.fecha,
                 cliente: formData.tipo === 'Venta' ? formData.cliente : null,
+                venta_asociada: ventaSeleccionada || null,
                 origen: formData.origen,
-                destino: formData.destino,
+                destino: formData.tipo === 'Interno' ? formData.destino : null,
                 observaciones: formData.observaciones,
                 estado: formData.estado,
                 items: items.map(item => ({
-                    producto_id: item.producto_id,
-                    cantidad: item.cantidad,
-                    codigo_barras: item.codigo_barras
+                    product_id: item.producto_id,
+                    quantity: item.cantidad
                 }))
             };
+
+            console.log('📦 Datos a enviar:', remitoData);  // ← AGREGAR ESTE LOG
 
             await api.create('/delivery-notes/', remitoData);
             
@@ -297,9 +290,6 @@ const NuevoRemitoForm = () => {
                                                 
                                                 // Crear items con nombres de productos correctos
                                                 const itemsDeVenta = venta.items.map(itemVenta => {
-                                                    // Buscar el producto en la lista de productos cargados
-                                                    const productoEncontrado = productos.find(p => p.id === itemVenta.product);
-                                                    
                                                     return {
                                                         id: `venta-${itemVenta.id}`,
                                                         codigo_barras: `BAR-VENTA-${itemVenta.product}`,
@@ -314,19 +304,34 @@ const NuevoRemitoForm = () => {
                                                 setItems(itemsDeVenta);
                                             }
                                         } else {
-                                            // Si se deselecciona la venta, limpiar los items
                                             setItems([]);
                                         }
                                     }}
+                                    disabled={!formData.cliente}
                                 >
                                     <MenuItem value=""><em>Ninguna</em></MenuItem>
-                                    {ventas.map(venta => (
-                                        <MenuItem key={venta.id} value={venta.id}>
-                                            {`Venta #${venta.id} - ${venta.client?.name || 'N/A'} - ${new Date(venta.sale_date).toLocaleDateString()}`}
-                                        </MenuItem>
-                                    ))}
+                                    {ventas
+                                        .filter(venta => {
+                                            // Filtrar solo ventas del cliente seleccionado
+                                            const clienteId = typeof venta.client === 'object' ? venta.client.id : venta.client;
+                                            return clienteId === formData.cliente;
+                                        })
+                                        .map(venta => (
+                                            <MenuItem key={venta.id} value={venta.id}>
+                                                {`Venta #${venta.id} - ${new Date(venta.sale_date).toLocaleDateString()} - $${venta.total_amount || 0}`}
+                                            </MenuItem>
+                                        ))
+                                    }
                                 </Select>
                             </FormControl>
+                            {formData.cliente && ventas.filter(v => {
+                                const clienteId = typeof v.client === 'object' ? v.client.id : v.client;
+                                return clienteId === formData.cliente;
+                            }).length === 0 && (
+                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                    Este cliente no tiene ventas registradas.
+                                </Typography>
+                            )}
                         </Grid>
                     )}
 
@@ -358,17 +363,25 @@ const NuevoRemitoForm = () => {
                                 onChange={handleFormChange}
                             >
                                 {formData.tipo === 'Venta' ? (
-                                    clientes.map(cliente => (
-                                        <MenuItem key={`cliente-${cliente.id}`} value={cliente.id}>
-                                            {cliente.name} (Cliente)
+                                    // Solo mostrar el cliente seleccionado
+                                    formData.cliente ? (
+                                        <MenuItem value={formData.cliente}>
+                                            {clientes.find(c => c.id === formData.cliente)?.name || 'Cliente'} (Cliente)
                                         </MenuItem>
-                                    ))
+                                    ) : (
+                                        <MenuItem value="" disabled>
+                                            <em>Primero seleccione un cliente</em>
+                                        </MenuItem>
+                                    )
                                 ) : (
-                                    almacenes.map(almacen => (
-                                        <MenuItem key={`almacen-${almacen.id}`} value={almacen.id}>
-                                            {almacen.name} (Almacén)
-                                        </MenuItem>
-                                    ))
+                                    // Para remitos internos, mostrar todos los almacenes excepto el origen
+                                    almacenes
+                                        .filter(almacen => almacen.id !== formData.origen)
+                                        .map(almacen => (
+                                            <MenuItem key={`almacen-${almacen.id}`} value={almacen.id}>
+                                                {almacen.name} (Almacén)
+                                            </MenuItem>
+                                        ))
                                 )}
                             </Select>
                         </FormControl>
@@ -393,7 +406,7 @@ const NuevoRemitoForm = () => {
                 <Typography variant="h6" gutterBottom>Agregar Productos</Typography>
                 
                 <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} md={3}>
+                    <Grid item xs={12} md={2}>
                         <TextField
                             name="codigo_barras"
                             label="Código de Barras"
@@ -415,7 +428,7 @@ const NuevoRemitoForm = () => {
                         />
                     </Grid>
 
-                    <Grid item xs={12} md={4}>
+                    <Grid item xs={12} md={5}>
                         <Autocomplete
                             options={productosInventario}
                             getOptionLabel={(option) => option.name || ''}
@@ -425,6 +438,33 @@ const NuevoRemitoForm = () => {
                                 <TextField {...params} label="Producto" fullWidth />
                             )}
                             disabled={!formData.origen}
+                            ListboxProps={{
+                                style: {
+                                    maxHeight: '400px',
+                                }
+                            }}
+                            componentsProps={{
+                                popper: {
+                                    style: {
+                                        width: 'fit-content',
+                                        minWidth: '500px'
+                                    }
+                                }
+                            }}
+                            renderOption={(props, option) => (
+                                <li {...props} style={{ whiteSpace: 'normal', padding: '8px 16px' }}>
+                                    <Box>
+                                        <Typography variant="body1" component="div">
+                                            {option.name}
+                                        </Typography>
+                                        {option.sku && (
+                                            <Typography variant="caption" color="text.secondary">
+                                                SKU: {option.sku}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </li>
+                            )}
                         />
                     </Grid>
 
