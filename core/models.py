@@ -719,14 +719,29 @@ class EmployeeRole(TenantAwareModel):
         return self.name
 
 class Employee(TenantAwareModel):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    # Datos personales obligatorios (temporalmente opcionales para migración)
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    dni = models.CharField(max_length=20)
+    cuil = models.CharField(max_length=20)
+    birth_date = models.DateField(null=True)
+    address = models.CharField(max_length=255)
+    phone = models.CharField(max_length=30, null=True, blank=True)
+    
+    # Familiares a cargo
+    dependents = models.JSONField(default=list, blank=True)
+    
+    # Observaciones
+    observations = models.TextField(blank=True, null=True)
+    
+    # Datos laborales
+    user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True)
     factory = models.ForeignKey(Factory, on_delete=models.SET_NULL, null=True, blank=True)
-    local = models.ForeignKey(Local, on_delete=models.SET_NULL, null=True, blank=True)
     role = models.ForeignKey(EmployeeRole, on_delete=models.SET_NULL, null=True, blank=True)
     hire_date = models.DateField()
 
     def __str__(self):
-        return self.user.email
+        return f"{self.first_name} {self.last_name}"
 
 class Salary(TenantAwareModel):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)

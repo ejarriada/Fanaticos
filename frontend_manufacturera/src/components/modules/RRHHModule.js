@@ -2,13 +2,10 @@ import React, { useState } from 'react';
 import { Box, Tab, Tabs, Typography } from '@mui/material';
 
 import EmployeeManagement from './EmployeeManagement';
-
+import EmployeeRoleManagement from './EmployeeRoleManagement';
 import SalaryManagement from './SalaryManagement';
-
 import VacationManagement from './VacationManagement';
-
 import MedicalRecordManagement from './MedicalRecordManagement';
-
 import AbsencesManagement from './AbsencesManagement';
 
 function TabPanel(props) {
@@ -44,25 +41,29 @@ const RRHHModule = () => {
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                 <Tabs value={value} onChange={handleChange} aria-label="pestañas de RRHH">
                     <Tab label="Gestión de Empleados" id="rrhh-tab-0" />
-                    <Tab label="Gestión de Salarios" id="rrhh-tab-1" />
-                    <Tab label="Vacaciones/Permisos" id="rrhh-tab-2" />
-                    <Tab label="Carpetas Médicas" id="rrhh-tab-3" />
-                    <Tab label="Ausentes" id="rrhh-tab-4" />
+                    <Tab label="Roles de Empleados" id="rrhh-tab-1" />
+                    <Tab label="Gestión de Salarios" id="rrhh-tab-2" />
+                    <Tab label="Vacaciones/Permisos" id="rrhh-tab-3" />
+                    <Tab label="Carpetas Médicas" id="rrhh-tab-4" />
+                    <Tab label="Ausentes" id="rrhh-tab-5" />
                 </Tabs>
             </Box>
             <TabPanel value={value} index={0}>
                 <EmployeeManagement />
             </TabPanel>
             <TabPanel value={value} index={1}>
-                <SalaryManagement />
+                <EmployeeRoleManagement />
             </TabPanel>
             <TabPanel value={value} index={2}>
-                <VacationManagement />
+                <SalaryManagement />
             </TabPanel>
             <TabPanel value={value} index={3}>
-                <MedicalRecordManagement />
+                <VacationManagement />
             </TabPanel>
             <TabPanel value={value} index={4}>
+                <MedicalRecordManagement />
+            </TabPanel>
+            <TabPanel value={value} index={5}>
                 <AbsencesManagement />
             </TabPanel>
         </Box>

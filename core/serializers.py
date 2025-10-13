@@ -612,9 +612,6 @@ class ProductionOrderFileSerializer(TenantAwareSerializer):
         model = ProductionOrderFile
         fields = ['id', 'file', 'description']
 
-# ==============================================================================
-# REFACTOR: Base, ReadOnly, and Write-Specific Production Order Serializers
-# ==============================================================================
 
 class ProductionOrderBaseSerializer(TenantAwareSerializer):
     """
@@ -1169,9 +1166,18 @@ class EmployeeRoleSerializer(TenantAwareSerializer):
         fields = '__all__'
 
 class EmployeeSerializer(TenantAwareSerializer):
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    factory_name = serializers.CharField(source='factory.name', read_only=True)
+    role_name = serializers.CharField(source='role.name', read_only=True)
+    
     class Meta(TenantAwareSerializer.Meta):
         model = Employee
-        fields = '__all__'
+        fields = [
+            'id', 'first_name', 'last_name', 'dni', 'cuil', 'birth_date',
+            'address', 'phone', 'dependents', 'observations',
+            'user', 'user_email', 'factory', 'factory_name', 
+            'role', 'role_name', 'hire_date'
+        ]
 
 class SalarySerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):
