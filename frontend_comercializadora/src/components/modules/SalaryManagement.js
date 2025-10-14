@@ -26,7 +26,6 @@ const SalaryForm = ({ open, onClose, onSave, salary }) => {
                 setEmployees(employeeList || []);
             } catch (err) {
                 setEmployeesError('Error al cargar los empleados.');
-                console.error(err);
             } finally {
                 setLoadingEmployees(false);
             }
@@ -94,7 +93,7 @@ const SalaryForm = ({ open, onClose, onSave, salary }) => {
                 >
                     {employees.map((employee) => (
                         <MenuItem key={employee.id} value={employee.id}>
-                            {employee.user_email || employee.user}
+                            {`${employee.first_name} ${employee.last_name}`}
                         </MenuItem>
                     ))}
                 </TextField>
@@ -210,7 +209,7 @@ const SalaryManagement = () => {
                         <TableBody>
                             {salaries.map((salary) => (
                                 <TableRow key={salary.id}>
-                                    <TableCell>{salary.employee_name || salary.employee}</TableCell>
+                                    <TableCell>{salary.employee_name || 'Sin empleado'}</TableCell>
                                     <TableCell>{salary.amount}</TableCell>
                                     <TableCell>{salary.pay_date}</TableCell>
                                     <TableCell>

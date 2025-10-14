@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Box, Button, Paper, Table, TableBody, TableCell, TableContainer, 
-    TableHead, TableRow, IconButton, Typography, Dialog, DialogActions, 
+    TableHead, TableRow, IconButton, Dialog, DialogActions, 
     DialogContent, DialogTitle, TextField, CircularProgress, Alert, MenuItem 
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
@@ -40,9 +40,10 @@ const SalaryForm = ({ open, onClose, onSave, salary }) => {
     useEffect(() => {
         if (salary) {
             setFormData({
-                ...salary,
+                id: salary.id,
+                employee: salary.employee?.id || salary.employee || '',
+                amount: salary.amount || '',
                 pay_date: salary.pay_date ? new Date(salary.pay_date).toISOString().split('T')[0] : '',
-                employee: salary.employee?.id || '',
             });
         } else {
             setFormData({
@@ -94,7 +95,7 @@ const SalaryForm = ({ open, onClose, onSave, salary }) => {
                 >
                     {employees.map((employee) => (
                         <MenuItem key={employee.id} value={employee.id}>
-                            {employee.user_email || employee.user}
+                            {`${employee.first_name} ${employee.last_name}`}
                         </MenuItem>
                     ))}
                 </TextField>

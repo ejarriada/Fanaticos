@@ -1181,9 +1181,16 @@ class EmployeeSerializer(TenantAwareSerializer):
         read_only_fields = ['user_email', 'factory_name', 'role_name']
 
 class SalarySerializer(TenantAwareSerializer):
+    employee_name = serializers.SerializerMethodField()
+    
     class Meta(TenantAwareSerializer.Meta):
         model = Salary
         fields = '__all__'
+    
+    def get_employee_name(self, obj):
+        if obj.employee:
+            return f"{obj.employee.first_name} {obj.employee.last_name}"
+        return "Sin empleado"
 
 class VacationSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):

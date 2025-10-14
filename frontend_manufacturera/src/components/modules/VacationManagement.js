@@ -95,7 +95,7 @@ const VacationForm = ({ open, onClose, onSave, vacation }) => {
                 >
                     {employees.map((employee) => (
                         <MenuItem key={employee.id} value={employee.id}>
-                            {employee.user_email || employee.user}
+                            {`${employee.first_name} ${employee.last_name}`}
                         </MenuItem>
                     ))}
                 </TextField>
