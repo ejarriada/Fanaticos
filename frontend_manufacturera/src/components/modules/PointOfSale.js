@@ -7,6 +7,7 @@ import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { useFinancialCost } from '../../hooks/useFinancialCost'; // Importar el hook
+import { normalizeChequeToBackend } from '../../utils/chequeTransformers'; // Importar normalizador
 import ChequeDialog from '../common/ChequeDialog'; // Importar el componente reutilizable
 
 const PointOfSale = () => {
@@ -201,10 +202,11 @@ const PointOfSale = () => {
     };
 
 
-    const handleSaveCheque = async (chequeToSave) => {
+    const handleSaveCheque = async (chequeFromDialog) => {
         try {
+            const chequeToSave = normalizeChequeToBackend(chequeFromDialog);
             const savedCheque = await api.create('/checks/', chequeToSave);
-            setChequeData(savedCheque);
+            setChequeData(savedCheque); // Guardar el cheque con el formato del backend
             setNewSale({ ...newSale, check_id: savedCheque.id });
             setShowChequeDialog(false);
         } catch (error) {
@@ -623,6 +625,7 @@ const PointOfSale = () => {
                 onSave={handleSaveCheque}
                 cheque={chequeData}
                 prefilledAmount={newSale.net_total_amount}
+                banks={banks} // Pasar la lista de bancos
             />
 
         </Box>

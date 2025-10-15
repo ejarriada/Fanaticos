@@ -4,6 +4,7 @@ import {
 } from '@mui/material';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
+import { normalizeChequeFromBackend } from '../../utils/chequeTransformers'; // Importar normalizador
 
 const FinancialSummary = () => {
     const [summaryData, setSummaryData] = useState(null);
@@ -17,46 +18,29 @@ const FinancialSummary = () => {
         try {
             setLoading(true);
             
-            // 1. Obtener datos de cajas del día
             const cashRegisterData = await api.list('/cash-registers/');
             const totalCashBalance = Array.isArray(cashRegisterData) 
                 ? cashRegisterData.reduce((acc, register) => acc + parseFloat(register.balance || 0), 0)
                 : 0;
 
-            // 2. Obtener todos los cheques
-            const chequesData = await api.list('/checks/');
-            const chequesList = Array.isArray(chequesData) ? chequesData : chequesData.results || [];
+            const chequesResponse = await api.list('/checks/');
+            const chequesList = Array.isArray(chequesResponse.results) ? chequesResponse.results : [];
+            const normalizedChecks = chequesList.map(normalizeChequeFromBackend);
 
-            // 3. Calcular saldos de cheques por estado
-            const chequesByStatus = {
-                CARGADO: 0,
-                ENTREGADO: 0,
-                RECHAZADO: 0,
-                COBRADO: 0,
-                ANULADO: 0
-            };
+            const checksByStatus = normalizedChecks.reduce((acc, check) => {
+                const status = check.status || 'SIN ESTADO';
+                acc[status] = (acc[status] || 0) + parseFloat(check.amount);
+                return acc;
+            }, {});
 
-            let totalThirdPartyAvailable = 0;
-            let totalOwnCheques = 0;
+            const totalThirdPartyAvailable = normalizedChecks
+                .filter(c => !c.is_own && c.status === 'CARGADO')
+                .reduce((acc, c) => acc + parseFloat(c.amount), 0);
 
-            chequesList.forEach(cheque => {
-                const amount = parseFloat(cheque.amount || 0);
-                const status = cheque.status;
-                
-                chequesByStatus[status] = (chequesByStatus[status] || 0) + amount;
+            const totalOwnCheques = normalizedChecks
+                .filter(c => c.is_own)
+                .reduce((acc, c) => acc + parseFloat(c.amount), 0);
 
-                // Cheques de terceros disponibles (CARGADO = recibidos y disponibles)
-                if (status === 'CARGADO') {
-                    totalThirdPartyAvailable += amount;
-                }
-
-                // Cheques propios (ENTREGADOS = emitidos por nosotros y entregados)
-                if (status === 'ENTREGADO') {
-                    totalOwnCheques += amount;
-                }
-            });
-
-            // 4. Obtener transacciones del día para calcular movimientos
             const today = new Date(selectedDate);
             const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
             const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
@@ -64,9 +48,7 @@ const FinancialSummary = () => {
             const transactionsData = await api.list(
                 `/transactions/?created_at__gte=${startOfDay}&created_at__lte=${endOfDay}`
             );
-            const transactions = Array.isArray(transactionsData) 
-                ? transactionsData 
-                : transactionsData.results || [];
+            const transactions = Array.isArray(transactionsData.results) ? transactionsData.results : [];
 
             const totalIncomeToday = transactions
                 .filter(t => t.type === 'INGRESO')
@@ -76,12 +58,10 @@ const FinancialSummary = () => {
                 .filter(t => t.type === 'EGRESO')
                 .reduce((acc, t) => acc + parseFloat(t.amount || 0), 0);
 
-            // 5. Consolidar datos
             const combinedData = {
                 cash_balance: totalCashBalance,
                 third_party_cheques_balance: totalThirdPartyAvailable,
                 own_cheques_balance: totalOwnCheques,
-                cheques_by_status: chequesByStatus,
                 total_cheques: chequesList.length,
                 income_today: totalIncomeToday,
                 expense_today: totalExpenseToday,
@@ -89,7 +69,7 @@ const FinancialSummary = () => {
             };
 
             setSummaryData(combinedData);
-            setChequeData(chequesByStatus);
+            setChequeData(checksByStatus);
             setError(null);
         } catch (err) {
             setError('Error al cargar el resumen financiero.');

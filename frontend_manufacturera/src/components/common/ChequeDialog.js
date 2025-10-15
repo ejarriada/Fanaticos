@@ -25,12 +25,10 @@ const ChequeDialog = ({
     onSave, 
     cheque = null, 
     prefilledAmount = null,
-    readOnly = false 
+    readOnly = false, 
+    banks = [] // Recibir bancos como prop
 }) => {
     const [formData, setFormData] = useState({});
-    const [banks, setBanks] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
     const { tenantId } = useAuth();
 
     const CHEQUE_STATUS_CHOICES = [
@@ -42,53 +40,22 @@ const ChequeDialog = ({
     ];
 
     useEffect(() => {
-        const fetchBanks = async () => {
-            try {
-                setLoading(true);
-                const data = await api.list('/banks/');
-                setBanks(Array.isArray(data) ? data : data.results || []);
-                setError(null);
-            } catch (err) {
-                setError('Error al cargar los bancos.');
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (tenantId) {
-            fetchBanks();
-        }
-    }, [tenantId]);
-
-    useEffect(() => {
         if (open) {
+            console.log("ChequeDialog recibió:", cheque);
             const initialFormData = {
-                number: '',
-                amount: '',
-                bank: '',
-                issuer: '',
-                cuit: '',
-                due_date: '',
-                recipient: '',
-                received_from: '',
-                observations: '',
-                status: 'CARGADO',
+                number: cheque?.number || cheque?.order_number || '',
+                amount: cheque?.amount || prefilledAmount || '',
+                bank: cheque?.bank?.id || cheque?.bank || '',
+                issuer: cheque?.issuer || '',
+                cuit: cheque?.cuit || '',
+                due_date: cheque?.due_date ? new Date(cheque.due_date).toISOString().split('T')[0] : '',
+                recipient: cheque?.recipient || cheque?.receiver || '',
+                received_from: cheque?.received_from || '',
+                observations: cheque?.observations || '',
+                status: cheque?.status ? cheque.status.toUpperCase() : 'CARGADO',
             };
-
-            if (cheque) {
-                setFormData({
-                    ...initialFormData,
-                    ...cheque,
-                    due_date: cheque.due_date ? new Date(cheque.due_date).toISOString().split('T')[0] : '',
-                    bank: cheque.bank?.id || cheque.bank || '',
-                });
-            } else {
-                setFormData({
-                    ...initialFormData,
-                    amount: prefilledAmount || '',
-                });
-            }
+            setFormData(initialFormData);
+            console.log("Formulario inicializado con:", initialFormData);
         }
     }, [cheque, open, prefilledAmount]);
 
@@ -108,14 +75,10 @@ const ChequeDialog = ({
 
     const isSaveDisabled = !formData.number || !formData.amount || !formData.issuer;
 
-    return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>{readOnly ? 'Ver Cheque' : (cheque ? 'Editar Cheque' : 'Nuevo Cheque')}</DialogTitle>
-            <DialogContent>
-                {loading && <CircularProgress />}
-                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-                
-                {!loading && (
+        return (
+            <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+                <DialogTitle>{readOnly ? 'Ver Cheque' : (cheque ? 'Editar Cheque' : 'Nuevo Cheque')}</DialogTitle>
+                <DialogContent>
                     <div style={{ paddingTop: '10px' }}>
                         <TextField margin="dense" name="number" label="Número" type="text" fullWidth value={formData.number || ''} onChange={handleChange} InputProps={{ readOnly: readOnly }} />
                         <TextField margin="dense" name="amount" label="Monto $" type="number" fullWidth value={formData.amount || ''} onChange={handleChange} InputProps={{ readOnly: readOnly }} />
@@ -128,7 +91,7 @@ const ChequeDialog = ({
                                 ))}
                             </Select>
                         </FormControl>
-
+    
                         <TextField margin="dense" name="issuer" label="Emisor" type="text" fullWidth value={formData.issuer || ''} onChange={handleChange} InputProps={{ readOnly: readOnly }} />
                         <TextField margin="dense" name="cuit" label="CUIT" type="text" fullWidth value={formData.cuit || ''} onChange={handleChange} InputProps={{ readOnly: readOnly }} />
                         <TextField margin="dense" name="due_date" label="Vencimiento" type="date" fullWidth value={formData.due_date || ''} onChange={handleChange} InputLabelProps={{ shrink: true }} InputProps={{ readOnly: readOnly }} />
@@ -145,16 +108,14 @@ const ChequeDialog = ({
                             </Select>
                         </FormControl>
                     </div>
-                )}
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose}>Cancelar</Button>
-                {!readOnly && (
-                    <Button onClick={handleSubmit} disabled={isSaveDisabled}>Guardar</Button>
-                )}
-            </DialogActions>
-        </Dialog>
-    );
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={onClose}>Cancelar</Button>
+                    {!readOnly && (
+                        <Button onClick={handleSubmit} disabled={isSaveDisabled}>Guardar</Button>
+                    )}
+                </DialogActions>
+            </Dialog>
+        );
 };
-
 export default ChequeDialog;

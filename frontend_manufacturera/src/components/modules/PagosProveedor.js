@@ -6,12 +6,14 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import * as api from '../../utils/api';
 import { useFinancialCost } from '../../hooks/useFinancialCost'; // Importar el hook
+import { normalizeChequeToBackend } from '../../utils/chequeTransformers'; // Importar normalizador
 import ChequeDialog from '../common/ChequeDialog'; // Importar el componente reutilizable
 const PagosProveedor = () => {
     const [suppliers, setSuppliers] = useState([]);
     const [cashboxes, setCashboxes] = useState([]);
     const [accounts, setAccounts] = useState([]);
     const [paymentMethodTypes, setPaymentMethodTypes] = useState([]);
+    const [banks, setBanks] = useState([]); // Estado para los bancos
     const [checks, setChecks] = useState([]);
     const [purchaseOrders, setPurchaseOrders] = useState([]); // Orders for selected supplier
     const [paymentHistory, setPaymentHistory] = useState([]); // Payments for selected PO
@@ -36,16 +38,18 @@ const PagosProveedor = () => {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const [suppliersData, cashboxesData, accountsData, paymentMethodsData] = await Promise.all([
+                const [suppliersData, cashboxesData, accountsData, paymentMethodsData, banksData] = await Promise.all([
                     api.list('/suppliers/'),
                     api.list('/cash-registers/'),
                     api.list('/accounts/'),
                     api.list('/payment-method-types/'),
+                    api.list('/banks/'), // Obtener también los bancos
                 ]);
                 setSuppliers(suppliersData.results || (Array.isArray(suppliersData) ? suppliersData : []));
                 setCashboxes(cashboxesData.results || (Array.isArray(cashboxesData) ? cashboxesData : []));
                 setAccounts(accountsData.results || (Array.isArray(accountsData) ? accountsData : []));
                 setPaymentMethodTypes(paymentMethodsData.results || (Array.isArray(paymentMethodsData) ? paymentMethodsData : []));
+                setBanks(banksData.results || (Array.isArray(banksData) ? banksData : [])); // Guardar los bancos
 
                 const cashboxes = cashboxesData.results || (Array.isArray(cashboxesData) ? cashboxesData : []);
                 setCashboxes(cashboxes);
@@ -118,9 +122,10 @@ const PagosProveedor = () => {
         fetchPaymentHistory();
     }, [selectedPurchaseOrder]);
 
-    const handleSaveCheck = async (checkData) => {
+    const handleSaveCheck = async (chequeFromDialog) => {
         try {
-            const savedCheck = await api.create('/checks/', checkData);
+            const chequeToSave = normalizeChequeToBackend(chequeFromDialog);
+            const savedCheck = await api.create('/checks/', chequeToSave);
             setChecks(prevChecks => [...prevChecks, savedCheck]); // Actualizar el estado local
             setSelectedCheckId(savedCheck.id); // Auto-seleccionar el nuevo cheque
             setIsCheckFormOpen(false);
@@ -421,6 +426,7 @@ const PagosProveedor = () => {
                 open={isCheckFormOpen} 
                 onClose={() => setIsCheckFormOpen(false)} 
                 onSave={handleSaveCheck} 
+                banks={banks} // Pasar la lista de bancos
             />
         </Box>
     );

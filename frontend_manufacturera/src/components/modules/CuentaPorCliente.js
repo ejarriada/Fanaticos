@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import * as api from '../../utils/api';
 import { useFinancialCost } from '../../hooks/useFinancialCost'; // Importar el hook
+import { normalizeChequeToBackend } from '../../utils/chequeTransformers'; // Importar normalizador
 import ChequeDialog from '../common/ChequeDialog'; // Importar el componente reutilizable
 
 const CuentaPorCliente = () => {
@@ -152,10 +153,11 @@ const CuentaPorCliente = () => {
     };
 
 
-    const handleSaveCheque = async (chequeToSave) => {
+    const handleSaveCheque = async (chequeFromDialog) => {
         try {
+            const chequeToSave = normalizeChequeToBackend(chequeFromDialog);
             const savedCheque = await api.create('/checks/', chequeToSave);
-            setChequeData(savedCheque);
+            setChequeData(savedCheque); // Guardar el cheque con el formato del backend
             setShowChequeDialog(false);
             
             // Auto-llenar el monto del cobro con el monto del cheque
@@ -536,6 +538,7 @@ const CuentaPorCliente = () => {
                             onSave={handleSaveCheque}
                             cheque={chequeData} // Pasar el cheque existente para edición
                             prefilledAmount={newMovement.amount}
+                            banks={banks} // Pasar la lista de bancos
                         />
                         
                         </Paper>
