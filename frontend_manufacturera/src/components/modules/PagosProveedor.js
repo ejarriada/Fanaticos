@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import {
+import { 
     Box, Button, Typography, TextField, Select, MenuItem, FormControl, InputLabel, Grid, Autocomplete, Paper, IconButton,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress, Alert
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import * as api from '../../utils/api';
-import NewCheckForm from './NewCheckForm';
-
+import { useFinancialCost } from '../../hooks/useFinancialCost'; // Importar el hook
+import ChequeDialog from '../common/ChequeDialog'; // Importar el componente reutilizable
 const PagosProveedor = () => {
     const [suppliers, setSuppliers] = useState([]);
     const [cashboxes, setCashboxes] = useState([]);
@@ -26,9 +26,10 @@ const PagosProveedor = () => {
     const [selectedCheckId, setSelectedCheckId] = useState('');
 
     const [isCheckFormOpen, setIsCheckFormOpen] = useState(false);
-    const [refreshChecks, setRefreshChecks] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const { calculateFinancialCost } = useFinancialCost(); // Instanciar el hook
+    const [financialCost, setFinancialCost] = useState(0);
 
     // Fetch initial data: Suppliers, Cashboxes, Accounts, Payment Methods
     useEffect(() => {
@@ -45,6 +46,12 @@ const PagosProveedor = () => {
                 setCashboxes(cashboxesData.results || (Array.isArray(cashboxesData) ? cashboxesData : []));
                 setAccounts(accountsData.results || (Array.isArray(accountsData) ? accountsData : []));
                 setPaymentMethodTypes(paymentMethodsData.results || (Array.isArray(paymentMethodsData) ? paymentMethodsData : []));
+
+                const cashboxes = cashboxesData.results || (Array.isArray(cashboxesData) ? cashboxesData : []);
+                setCashboxes(cashboxes);
+                if (cashboxes.length === 1) {
+                    setSelectedCashbox(cashboxes[0].id);
+                }
             } catch (err) {
                 console.error("Error fetching initial data", err);
                 setError('Error al cargar datos iniciales.');
@@ -66,7 +73,7 @@ const PagosProveedor = () => {
             }
         };
         fetchChecks();
-    }, [refreshChecks]);
+    }, []);
 
     // Fetch Purchase Orders for selected supplier
     useEffect(() => {
@@ -113,8 +120,9 @@ const PagosProveedor = () => {
 
     const handleSaveCheck = async (checkData) => {
         try {
-            await api.create('/checks/', checkData);
-            setRefreshChecks(prev => !prev); // Trigger refresh
+            const savedCheck = await api.create('/checks/', checkData);
+            setChecks(prevChecks => [...prevChecks, savedCheck]); // Actualizar el estado local
+            setSelectedCheckId(savedCheck.id); // Auto-seleccionar el nuevo cheque
             setIsCheckFormOpen(false);
         } catch (error) {
             console.error("Failed to save check", error);
@@ -125,6 +133,12 @@ const PagosProveedor = () => {
     const handlePayment = async (paymentMethod) => {
         if (!selectedSupplier || !selectedPurchaseOrder || !paymentAmount || !selectedPaymentMethodType) {
             setError('Por favor, complete todos los campos requeridos para el pago.');
+            return;
+        }
+
+        const outstandingBalance = getOutstandingBalance(selectedPurchaseOrder);
+        if (parseFloat(paymentAmount) > parseFloat(outstandingBalance)) {
+            setError('El monto del pago no puede ser mayor al saldo pendiente.');
             return;
         }
 
@@ -141,6 +155,8 @@ const PagosProveedor = () => {
 
         try {
             setLoading(true);
+            // El backend se encarga de crear la transacción financiera correspondiente
+            // y vincularla con este pago para asegurar la trazabilidad.
             await api.create('/payments/', paymentData);
             // Refresh purchase orders and payment history
             const updatedPurchaseOrders = await api.list(`/purchase-orders/?supplier=${selectedSupplier.id}&status__in=Pendiente,Comprada por Pagar`);
@@ -260,7 +276,12 @@ const PagosProveedor = () => {
                                         <InputLabel>Método de Pago</InputLabel>
                                         <Select
                                             value={selectedPaymentMethodType}
-                                            onChange={(e) => setSelectedPaymentMethodType(e.target.value)}
+                                            onChange={async (e) => {
+                                                const methodId = e.target.value;
+                                                const cost = await calculateFinancialCost(methodId, null, paymentAmount);
+                                                setFinancialCost(cost);
+                                                setSelectedPaymentMethodType(methodId);
+                                            }}
                                             label="Método de Pago"
                                         >
                                             {paymentMethodTypes.map((pmt) => (
@@ -282,7 +303,13 @@ const PagosProveedor = () => {
                                     />
                                 </Grid>
 
-                                {selectedPaymentMethodType && paymentMethodTypes.find(pmt => pmt.id === selectedPaymentMethodType)?.name === 'Efectivo' && (
+                                {financialCost > 0 && (
+                                    <Grid item xs={12}>
+                                        <Alert severity="warning">Costo financiero: ${financialCost.toFixed(2)}</Alert>
+                                    </Grid>
+                                )}
+
+                                {selectedPaymentMethodType && paymentMethodTypes.find(pmt => pmt.id === selectedPaymentMethodType)?.name === 'Efectivo' && cashboxes.length > 1 && (
                                     <Grid item xs={12} md={6}>
                                         <FormControl fullWidth margin="dense">
                                             <InputLabel>Caja</InputLabel>
@@ -390,7 +417,7 @@ const PagosProveedor = () => {
                 </Grid>
             </Grid>
 
-            <NewCheckForm 
+            <ChequeDialog 
                 open={isCheckFormOpen} 
                 onClose={() => setIsCheckFormOpen(false)} 
                 onSave={handleSaveCheck} 

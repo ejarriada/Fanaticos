@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
     Box, Paper, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, Typography, FormControl, InputLabel, Select, 
-    MenuItem, Button, TextField, Grid, Alert,
-    Dialog, DialogActions, DialogContent, DialogTitle
+    MenuItem, Button, TextField, Grid, Alert
 } from '@mui/material';
 import * as api from '../../utils/api';
+import { useFinancialCost } from '../../hooks/useFinancialCost'; // Importar el hook
+import ChequeDialog from '../common/ChequeDialog'; // Importar el componente reutilizable
 
 const CuentaPorCliente = () => {
     const [clients, setClients] = useState([]);
@@ -19,6 +20,7 @@ const CuentaPorCliente = () => {
     });
     const [accounts, setAccounts] = useState([]);
     const [selectedAccount, setSelectedAccount] = useState('');
+    const { calculateFinancialCost } = useFinancialCost(); // Instanciar el hook
 
     const [pendingSales, setPendingSales] = useState([]);
     const [selectedSale, setSelectedSale] = useState('');
@@ -32,15 +34,6 @@ const CuentaPorCliente = () => {
     const [selectedBank, setSelectedBank] = useState('');
     const [showChequeDialog, setShowChequeDialog] = useState(false);
     const [chequeData, setChequeData] = useState(null);
-    const [chequeFormData, setChequeFormData] = useState({
-        number: '',
-        amount: '',
-        bank: '',
-        issuer: '',
-        cuit: '',
-        due_date: '',
-        observations: ''
-    });
 
     useEffect(() => {
         const fetchClientsAndAccounts = async () => {
@@ -60,6 +53,9 @@ const CuentaPorCliente = () => {
                 setBanks(banksData || []);
                 if (accountsData && accountsData.length > 0) {
                     setSelectedAccount(accountsData[0].id);
+                }
+                if (cashRegistersData && cashRegistersData.length === 1) {
+                    setSelectedCashRegister(cashRegistersData[0].id);
                 }
             } catch (error) {
                 console.error("Error fetching initial data", error);
@@ -131,52 +127,33 @@ const CuentaPorCliente = () => {
         
         // Si es cheque, abrir el diálogo
         if (method && method.name.toLowerCase() === 'cheque') {
-            setChequeFormData({
-                ...chequeFormData,
-                amount: newMovement.amount || ''
-            });
             setShowChequeDialog(true);
         }
         
         if (method && newMovement.amount) {
             try {
-                let ruleQuery = `/financial-cost-rules/?payment_method=${methodId}`;
-                if (selectedBank) {
-                    ruleQuery += `&bank=${selectedBank}`;
-                }
-                
+                const cost = await calculateFinancialCost(methodId, selectedBank, newMovement.amount);
+                setFinancialCost(cost);
+                // Opcional: si aún se necesita mostrar el porcentaje, se tendría que buscar la regla de nuevo.
+                // Por simplicidad del hook, nos centramos en el costo calculado.
+                const ruleQuery = `/financial-cost-rules/?payment_method=${methodId}${selectedBank ? `&bank=${selectedBank}` : ''}`;
                 const rules = await api.list(ruleQuery);
                 if (rules && rules.length > 0) {
-                    const rule = rules[0];
-                    const percentage = parseFloat(rule.percentage);
-                    const cost = (parseFloat(newMovement.amount) * percentage) / 100;
-                    setFinancialCost(cost);
-                    setFinancialCostPercentage(percentage);
+                    setFinancialCostPercentage(parseFloat(rules[0].percentage));
                 } else {
-                    setFinancialCost(0);
                     setFinancialCostPercentage(0);
                 }
             } catch (error) {
-                console.error("Error fetching financial cost rules", error);
+                console.error("Error calculating financial cost", error);
                 setFinancialCost(0);
                 setFinancialCostPercentage(0);
             }
         }
     };
 
-    const handleChequeFormChange = (e) => {
-        setChequeFormData({ ...chequeFormData, [e.target.name]: e.target.value });
-    };
 
-    const handleSaveCheque = async () => {
+    const handleSaveCheque = async (chequeToSave) => {
         try {
-            const chequeToSave = {
-                ...chequeFormData,
-                amount: parseFloat(chequeFormData.amount),
-                bank: chequeFormData.bank || null,
-                status: 'CARGADO'
-            };
-            
             const savedCheque = await api.create('/checks/', chequeToSave);
             setChequeData(savedCheque);
             setShowChequeDialog(false);
@@ -194,6 +171,12 @@ const CuentaPorCliente = () => {
         
         if (!selectedAccount || !selectedSale) {
             alert("Debe seleccionar una venta y una cuenta destino");
+            return;
+        }
+
+        const sale = pendingSales.find(s => s.id === selectedSale);
+        if (sale && parseFloat(newMovement.amount) > parseFloat(sale.pending_balance)) {
+            alert('El monto a cobrar no puede ser mayor al saldo pendiente de la venta.');
             return;
         }
         
@@ -214,6 +197,8 @@ const CuentaPorCliente = () => {
             check_id: chequeData ? chequeData.id : null
         };
 
+        // El backend se encarga de crear la transacción financiera correspondiente
+        // y vincularla con este cobro para asegurar la trazabilidad.
         try {
             const response = await api.create(`/clients/${selectedClient}/register-payment/`, paymentData);
             
@@ -225,16 +210,7 @@ const CuentaPorCliente = () => {
             setSelectedPaymentMethod(null);
             setSelectedBank('');
             setFinancialCost(0);
-            setChequeData(null);
-            setChequeFormData({
-                number: '',
-                amount: '',
-                bank: '',
-                issuer: '',
-                cuit: '',
-                due_date: '',
-                observations: ''
-            });
+            setChequeData(null); // Limpiar el cheque guardado
             setShowForm(false);
             
             fetchMovements();
@@ -554,93 +530,13 @@ const CuentaPorCliente = () => {
                                 </Box>
                             </Box>
                         
-                        {/* ========== DIÁLOGO DE CHEQUE ========== */}
-                        <Dialog open={showChequeDialog} onClose={() => setShowChequeDialog(false)} maxWidth="sm" fullWidth>
-                            <DialogTitle>Datos del Cheque</DialogTitle>
-                            <DialogContent>
-                                <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                    <TextField
-                                        name="number"
-                                        label="Número de Cheque"
-                                        type="text"
-                                        fullWidth
-                                        value={chequeFormData.number}
-                                        onChange={handleChequeFormChange}
-                                        required
-                                    />
-                                    <TextField
-                                        name="amount"
-                                        label="Monto $"
-                                        type="number"
-                                        inputProps={{ step: "0.01", min: "0.01" }}
-                                        fullWidth
-                                        value={chequeFormData.amount}
-                                        onChange={handleChequeFormChange}
-                                        required
-                                    />
-                                    <FormControl fullWidth>
-                                        <InputLabel>Banco</InputLabel>
-                                        <Select
-                                            name="bank"
-                                            value={chequeFormData.bank}
-                                            label="Banco"
-                                            onChange={handleChequeFormChange}
-                                        >
-                                            <MenuItem value=""><em>Seleccione un banco</em></MenuItem>
-                                            {banks.map((bank) => (
-                                                <MenuItem key={bank.id} value={bank.id}>{bank.name}</MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-                                    <TextField
-                                        name="issuer"
-                                        label="Emisor/Librador"
-                                        type="text"
-                                        fullWidth
-                                        value={chequeFormData.issuer}
-                                        onChange={handleChequeFormChange}
-                                        required
-                                    />
-                                    <TextField
-                                        name="cuit"
-                                        label="CUIT"
-                                        type="text"
-                                        fullWidth
-                                        value={chequeFormData.cuit}
-                                        onChange={handleChequeFormChange}
-                                    />
-                                    <TextField
-                                        name="due_date"
-                                        label="Fecha de Vencimiento"
-                                        type="date"
-                                        fullWidth
-                                        value={chequeFormData.due_date}
-                                        onChange={handleChequeFormChange}
-                                        InputLabelProps={{ shrink: true }}
-                                    />
-                                    <TextField
-                                        name="observations"
-                                        label="Observaciones"
-                                        type="text"
-                                        fullWidth
-                                        multiline
-                                        rows={2}
-                                        value={chequeFormData.observations}
-                                        onChange={handleChequeFormChange}
-                                    />
-                                </Box>
-                            </DialogContent>
-                            <DialogActions>
-                                <Button onClick={() => setShowChequeDialog(false)}>Cancelar</Button>
-                                <Button 
-                                    onClick={handleSaveCheque} 
-                                    variant="contained"
-                                    disabled={!chequeFormData.number || !chequeFormData.amount || !chequeFormData.issuer}
-                                >
-                                    Guardar Cheque
-                                </Button>
-                            </DialogActions>
-                        </Dialog>
+                        <ChequeDialog
+                            open={showChequeDialog}
+                            onClose={() => setShowChequeDialog(false)}
+                            onSave={handleSaveCheque}
+                            cheque={chequeData} // Pasar el cheque existente para edición
+                            prefilledAmount={newMovement.amount}
+                        />
                         
                         </Paper>
                     )}

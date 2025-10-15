@@ -1,47 +1,99 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Box, Typography, CircularProgress, Alert, Paper, Grid, TextField, Button
+    Box, Typography, CircularProgress, Alert, Paper, Grid, TextField, Button, Divider
 } from '@mui/material';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 
 const FinancialSummary = () => {
     const [summaryData, setSummaryData] = useState(null);
+    const [chequesData, setChequeData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [month, setMonth] = useState(new Date().toISOString().split('T')[0].substring(0, 7)); // YYYY-MM
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
     const { tenantId } = useAuth();
 
     const fetchSummary = async () => {
         try {
             setLoading(true);
             
-            // Perform multiple API calls in parallel
-            const [balanceData, profitLossData, revenueExpensesData] = await Promise.all([
-                api.list(`/management/current-balance/?month=${month}`),
-                api.list(`/management/overall-profit-loss/?month=${month}`),
-                api.list(`/management/revenue-expenses/?month=${month}`)
-            ]);
+            // 1. Obtener datos de cajas del día
+            const cashRegisterData = await api.list('/cash-registers/');
+            const totalCashBalance = Array.isArray(cashRegisterData) 
+                ? cashRegisterData.reduce((acc, register) => acc + parseFloat(register.balance || 0), 0)
+                : 0;
 
-            // Combine the results into a single summary object
+            // 2. Obtener todos los cheques
+            const chequesData = await api.list('/checks/');
+            const chequesList = Array.isArray(chequesData) ? chequesData : chequesData.results || [];
+
+            // 3. Calcular saldos de cheques por estado
+            const chequesByStatus = {
+                CARGADO: 0,
+                ENTREGADO: 0,
+                RECHAZADO: 0,
+                COBRADO: 0,
+                ANULADO: 0
+            };
+
+            let totalThirdPartyAvailable = 0;
+            let totalOwnCheques = 0;
+
+            chequesList.forEach(cheque => {
+                const amount = parseFloat(cheque.amount || 0);
+                const status = cheque.status;
+                
+                chequesByStatus[status] = (chequesByStatus[status] || 0) + amount;
+
+                // Cheques de terceros disponibles (CARGADO = recibidos y disponibles)
+                if (status === 'CARGADO') {
+                    totalThirdPartyAvailable += amount;
+                }
+
+                // Cheques propios (ENTREGADOS = emitidos por nosotros y entregados)
+                if (status === 'ENTREGADO') {
+                    totalOwnCheques += amount;
+                }
+            });
+
+            // 4. Obtener transacciones del día para calcular movimientos
+            const today = new Date(selectedDate);
+            const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+            const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+            
+            const transactionsData = await api.list(
+                `/transactions/?created_at__gte=${startOfDay}&created_at__lte=${endOfDay}`
+            );
+            const transactions = Array.isArray(transactionsData) 
+                ? transactionsData 
+                : transactionsData.results || [];
+
+            const totalIncomeToday = transactions
+                .filter(t => t.type === 'INGRESO')
+                .reduce((acc, t) => acc + parseFloat(t.amount || 0), 0);
+
+            const totalExpenseToday = transactions
+                .filter(t => t.type === 'EGRESO')
+                .reduce((acc, t) => acc + parseFloat(t.amount || 0), 0);
+
+            // 5. Consolidar datos
             const combinedData = {
-                cash_balance: balanceData.cash_register_balances?.reduce((acc, cur) => acc + cur.balance, 0),
-                client_debt: balanceData.account_balances?.find(acc => acc.account__name === 'Cuentas por Cobrar')?.balance || 0,
-                supplier_debt: balanceData.account_balances?.find(acc => acc.account__name === 'Cuentas por Pagar')?.balance || 0,
-                overall_profit_loss: profitLossData.overall_profit_loss,
-                total_revenue: revenueExpensesData.total_revenue,
-                total_expenses: revenueExpensesData.total_expenses,
-                // These might need their own endpoints or be derived differently
-                third_party_cheques_balance: 0, 
-                own_cheques_balance: 0,
-                net_result: profitLossData.overall_profit_loss, // Or calculate from revenue/expenses
+                cash_balance: totalCashBalance,
+                third_party_cheques_balance: totalThirdPartyAvailable,
+                own_cheques_balance: totalOwnCheques,
+                cheques_by_status: chequesByStatus,
+                total_cheques: chequesList.length,
+                income_today: totalIncomeToday,
+                expense_today: totalExpenseToday,
+                net_today: totalIncomeToday - totalExpenseToday
             };
 
             setSummaryData(combinedData);
+            setChequeData(chequesByStatus);
             setError(null);
         } catch (err) {
             setError('Error al cargar el resumen financiero.');
-            console.error(err);
+            console.error('Error en fetchSummary:', err);
         } finally {
             setLoading(false);
         }
@@ -51,59 +103,179 @@ const FinancialSummary = () => {
         if (tenantId) {
             fetchSummary();
         }
-    }, [tenantId, month]);
+    }, [tenantId, selectedDate]);
 
-    const handleMonthChange = (e) => {
-        setMonth(e.target.value);
+    const handleDateChange = (e) => {
+        setSelectedDate(e.target.value);
     };
 
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom>Resumen Financiero</Typography>
+            <Typography variant="h4" gutterBottom>
+                Resumen Financiero del Día
+            </Typography>
 
-            <Box sx={{ mb: 3 }}>
+            <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
                 <TextField
-                    label="Mes"
-                    type="month"
-                    value={month}
-                    onChange={handleMonthChange}
+                    label="Fecha"
+                    type="date"
+                    value={selectedDate}
+                    onChange={handleDateChange}
                     InputLabelProps={{ shrink: true }}
+                    sx={{ width: 200 }}
                 />
-                <Button variant="contained" onClick={fetchSummary} sx={{ ml: 2 }}>Cargar Mes</Button>
+                <Button variant="contained" onClick={fetchSummary}>
+                    Actualizar
+                </Button>
             </Box>
 
             {loading && <CircularProgress />}
-            {error && <Alert severity="error">{error}</Alert>}
+            {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
-            {summaryData && !loading && !error && (
-                <Paper sx={{ p: 3 }}>
-                    <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6}>
-                            <Typography variant="subtitle1">Cajas:</Typography>
-                            <Typography variant="body1">${summaryData.cash_balance?.toFixed(2) || '0.00'}</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <Typography variant="subtitle1">Cheques de Terceros Disponibles:</Typography>
-                            <Typography variant="body1">${summaryData.third_party_cheques_balance?.toFixed(2) || '0.00'}</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <Typography variant="subtitle1">Clientes:</Typography>
-                            <Typography variant="body1">${summaryData.client_debt?.toFixed(2) || '0.00'}</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <Typography variant="subtitle1">Proveedores:</Typography>
-                            <Typography variant="body1">${summaryData.supplier_debt?.toFixed(2) || '0.00'}</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <Typography variant="subtitle1">Cheques Propios:</Typography>
-                            <Typography variant="body1">${summaryData.own_cheques_balance?.toFixed(2) || '0.00'}</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <Typography variant="subtitle1">Resultado:</Typography>
-                            <Typography variant="body1">${summaryData.net_result?.toFixed(2) || '0.00'}</Typography>
-                        </Grid>
+            {summaryData && !loading && (
+                <Grid container spacing={3}>
+                    {/* SECCIÓN 1: SALDO EN CAJAS */}
+                    <Grid item xs={12} md={6}>
+                        <Paper sx={{ p: 3, height: '100%', bgcolor: '#e3f2fd' }}>
+                            <Typography variant="h6" gutterBottom color="primary">
+                                Saldo Total en Cajas
+                            </Typography>
+                            <Typography variant="h4" color="primary.main">
+                                ${summaryData.cash_balance?.toFixed(2) || '0.00'}
+                            </Typography>
+                        </Paper>
                     </Grid>
-                </Paper>
+
+                    {/* SECCIÓN 2: MOVIMIENTOS DEL DÍA */}
+                    <Grid item xs={12} md={6}>
+                        <Paper sx={{ p: 3, height: '100%' }}>
+                            <Typography variant="h6" gutterBottom>
+                                Movimientos del Día
+                            </Typography>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                <Typography color="success.main">Cobros del día</Typography>
+                                <Typography color="success.main" fontWeight="bold">
+                                    ${summaryData.income_today?.toFixed(2) || '0.00'}
+                                </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography color="error.main">Pagos del día</Typography>
+                                <Typography color="error.main" fontWeight="bold">
+                                    ${summaryData.expense_today?.toFixed(2) || '0.00'}
+                                </Typography>
+                            </Box>
+                        </Paper>
+                    </Grid>
+
+                    {/* SECCIÓN 3: CHEQUES EN CARTERA POR ESTADO */}
+                    <Grid item xs={12}>
+                        <Paper sx={{ p: 3 }}>
+                            <Typography variant="h6" gutterBottom color="primary">
+                                Cheques en Cartera por Estado
+                            </Typography>
+                            <Divider sx={{ mb: 2 }} />
+                            
+                            {chequesData && (
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <Box sx={{ p: 2, bgcolor: '#fff3e0', borderRadius: 1 }}>
+                                            <Typography variant="subtitle2" color="text.secondary">
+                                                Cargado (Disponibles)
+                                            </Typography>
+                                            <Typography variant="h5" color="warning.main">
+                                                ${chequesData.CARGADO?.toFixed(2) || '0.00'}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <Box sx={{ p: 2, bgcolor: '#e8f5e9', borderRadius: 1 }}>
+                                            <Typography variant="subtitle2" color="text.secondary">
+                                                Entregados
+                                            </Typography>
+                                            <Typography variant="h5" color="success.main">
+                                                ${chequesData.ENTREGADO?.toFixed(2) || '0.00'}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <Box sx={{ p: 2, bgcolor: '#e3f2fd', borderRadius: 1 }}>
+                                            <Typography variant="subtitle2" color="text.secondary">
+                                                Cobrados
+                                            </Typography>
+                                            <Typography variant="h5" color="primary.main">
+                                                ${chequesData.COBRADO?.toFixed(2) || '0.00'}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <Box sx={{ p: 2, bgcolor: '#ffebee', borderRadius: 1 }}>
+                                            <Typography variant="subtitle2" color="text.secondary">
+                                                Rechazados
+                                            </Typography>
+                                            <Typography variant="h5" color="error.main">
+                                                ${chequesData.RECHAZADO?.toFixed(2) || '0.00'}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                                            <Typography variant="subtitle2" color="text.secondary">
+                                                Anulados
+                                            </Typography>
+                                            <Typography variant="h5" color="text.secondary">
+                                                ${chequesData.ANULADO?.toFixed(2) || '0.00'}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    <Grid item xs={12} sm={6} md={4}>
+                                        <Box sx={{ p: 2, bgcolor: '#f3e5f5', borderRadius: 1 }}>
+                                            <Typography variant="subtitle2" color="text.secondary">
+                                                Total Cheques
+                                            </Typography>
+                                            <Typography variant="h5" color="secondary.main">
+                                                {summaryData.total_cheques || 0} cheques
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+                            )}
+                        </Paper>
+                    </Grid>
+
+                    {/* SECCIÓN 4: RESUMEN DE CHEQUES */}
+                    <Grid item xs={12} md={6}>
+                        <Paper sx={{ p: 3, height: '100%', bgcolor: '#fff3e0' }}>
+                            <Typography variant="h6" gutterBottom color="warning.main">
+                                Cheques de Terceros Disponibles
+                            </Typography>
+                            <Typography variant="h4" color="warning.dark">
+                                ${summaryData.third_party_cheques_balance?.toFixed(2) || '0.00'}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                Cheques recibidos y disponibles para uso
+                            </Typography>
+                        </Paper>
+                    </Grid>
+
+                    <Grid item xs={12} md={6}>
+                        <Paper sx={{ p: 3, height: '100%', bgcolor: '#e8f5e9' }}>
+                            <Typography variant="h6" gutterBottom color="success.main">
+                                Cheques Propios Entregados
+                            </Typography>
+                            <Typography variant="h4" color="success.dark">
+                                ${summaryData.own_cheques_balance?.toFixed(2) || '0.00'}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                Cheques emitidos por nosotros y entregados
+                            </Typography>
+                        </Paper>
+                    </Grid>
+                </Grid>
             )}
         </Box>
     );
