@@ -22,7 +22,7 @@ services:
     depends_on:
       - backend
     environment:
-      - WDS_SOCKET_PORT=3000
+      - WDS_SOCKET_PORT=3001
       - WDS_SOCKET_HOST=0.0.0.0
 
   frontend_manufacturera:

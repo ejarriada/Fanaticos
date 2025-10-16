@@ -1,10 +1,13 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { AppBar, Toolbar, IconButton, Typography, Button } from '@mui/material';
+import { AppBar, IconButton, Button, Box } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import LogoutIcon from '@mui/icons-material/Logout';
+import PersonIcon from '@mui/icons-material/Person';
+import './Navbar.css';
 
-const Navbar = ({ drawerWidth, handleDrawerToggle, sidebarOpen }) => {
+const Navbar = ({ handleDrawerToggle }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
 
@@ -14,34 +17,47 @@ const Navbar = ({ drawerWidth, handleDrawerToggle, sidebarOpen }) => {
     };
 
     return (
-        <AppBar 
+        <AppBar
             position="fixed"
-            sx={{
-                width: { sm: `calc(100% - ${sidebarOpen ? drawerWidth : 0}px)` },
-                ml: { sm: `${sidebarOpen ? drawerWidth : 0}px` },
-                transition: (theme) =>
-                    theme.transitions.create(['width', 'margin'], {
-                        easing: theme.transitions.easing.sharp,
-                        duration: theme.transitions.duration.enteringScreen,
-                    }),
-            }}
+            sx={(theme) => ({
+                width: '100%',
+                zIndex: theme.zIndex.drawer + 1,
+                height: '56px',
+                backgroundColor: theme.palette.primary.main,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            })}
         >
-            <Toolbar>
+            <Box className="navbar-content">
                 <IconButton
                     color="inherit"
-                    aria-label="open drawer"
-                    edge="start"
                     onClick={handleDrawerToggle}
-                    sx={{ mr: 2 }}
+                    className="navbar-menu-button"
                 >
                     <MenuIcon />
                 </IconButton>
-                <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-                    {/* No text here, as per user request */}
-                </Typography>
-                {user && <Typography variant="subtitle1" sx={{ mr: 2 }}>Bienvenido, {user.email}</Typography>}
-                <Button color="inherit" onClick={handleLogout}>Cerrar Sesión</Button>
-            </Toolbar>
+
+                <span className="navbar-title">ERP Comercializadora</span>
+
+                <Box className="navbar-spacer" />
+
+                {user && (
+                    <Box className="navbar-user-box">
+                        <PersonIcon className="navbar-user-icon" />
+                        <span className="navbar-user-name">
+                            {user.first_name || user.email?.split('@')[0] || 'Usuario'}
+                        </span>
+                    </Box>
+                )}
+
+                <Button
+                    color="inherit"
+                    onClick={handleLogout}
+                    startIcon={<LogoutIcon />}
+                    className="navbar-logout-button"
+                >
+                    Salir
+                </Button>
+            </Box>
         </AppBar>
     );
 };

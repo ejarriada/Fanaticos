@@ -9,11 +9,14 @@ import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import { Box, CssBaseline, Toolbar } from '@mui/material';
 
+import { ThemeProvider } from '@mui/material/styles';
+import theme from './theme';
+
 // Import all placeholder module components
 import LocalManagement from './components/modules/LocalManagement';
 import SaleManagement from './components/modules/SaleManagement';
 import InventoryManagement from './components/modules/InventoryManagement';
-import HumanResourcesModule from './components/modules/HumanResourcesModule';
+
 import AccountingFinanceModule from './components/modules/AccountingFinanceModule';
 import SupplierManagement from './components/modules/SupplierManagement';
 import PurchaseOrderManagement from './components/modules/PurchaseOrderManagement';
@@ -81,56 +84,59 @@ function App() {
 
   return (
     <div className="App">
-      <Router>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/"
-            element={
-              <PrivateRoute>
-                <ManagementDashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/management-dashboard"
-            element={
-              <PrivateRoute>
-                <ManagementDashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/trading-dashboard"
-            element={
-              <PrivateRoute>
-                <TradingDashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/reports"
-            element={
-              <PrivateRoute>
-                <ReportsModule />
-              </PrivateRoute>
-            }
-          />
-          {/* Routes for other modules */}
-          <Route path="/locals" element={<PrivateRoute><LocalManagement /></PrivateRoute>} />
-          <Route path="/sales" element={<PrivateRoute><SaleManagement /></PrivateRoute>} />
-          <Route path="/inventory" element={<PrivateRoute><InventoryManagement /></PrivateRoute>} />
-          <Route path="/suppliers" element={<PrivateRoute><SupplierManagement /></PrivateRoute>} />
-          <Route path="/purchase-orders" element={<PrivateRoute><PurchaseOrderManagement /></PrivateRoute>} />
-          <Route path="/accounting-finance" element={<PrivateRoute><AccountingFinanceModule /></PrivateRoute>} />
-          <Route path="/human-resources" element={<PrivateRoute><HumanResourcesModule /></PrivateRoute>} />
-          <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Router>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/"
+              element={
+                <PrivateRoute>
+                  <ManagementDashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/management-dashboard"
+              element={
+                <PrivateRoute>
+                  <ManagementDashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/trading-dashboard"
+              element={
+                <PrivateRoute>
+                  <TradingDashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                <PrivateRoute>
+                  <ReportsModule />
+                </PrivateRoute>
+              }
+            />
+            {/* Routes for other modules */}
+            <Route path="/locals" element={<PrivateRoute><LocalManagement /></PrivateRoute>} />
+            <Route path="/sales" element={<PrivateRoute><SaleManagement /></PrivateRoute>} />
+            <Route path="/inventory" element={<PrivateRoute><InventoryManagement /></PrivateRoute>} />
+            <Route path="/suppliers" element={<PrivateRoute><SupplierManagement /></PrivateRoute>} />
+            <Route path="/purchase-orders" element={<PrivateRoute><PurchaseOrderManagement /></PrivateRoute>} />
+            <Route path="/accounting-finance" element={<PrivateRoute><AccountingFinanceModule /></PrivateRoute>} />
+            
+            <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
 
-          
+            
 
-          
-        </Routes>
-      </Router>
+            
+          </Routes>
+        </Router>
+      </ThemeProvider>
     </div>
   );
 }

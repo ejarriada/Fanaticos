@@ -1193,9 +1193,16 @@ class SalarySerializer(TenantAwareSerializer):
         return "Sin empleado"
 
 class VacationSerializer(TenantAwareSerializer):
+    employee_name = serializers.SerializerMethodField()
+    
     class Meta(TenantAwareSerializer.Meta):
         model = Vacation
         fields = '__all__'
+    
+    def get_employee_name(self, obj):
+        if obj.employee:
+            return f"{obj.employee.first_name} {obj.employee.last_name}"
+        return "Sin empleado"
 
 class PermitSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):
@@ -1203,9 +1210,16 @@ class PermitSerializer(TenantAwareSerializer):
         fields = '__all__'
 
 class MedicalRecordSerializer(TenantAwareSerializer):
+    employee_name = serializers.SerializerMethodField()
+    
     class Meta(TenantAwareSerializer.Meta):
         model = MedicalRecord
         fields = '__all__'
+    
+    def get_employee_name(self, obj):
+        if obj.employee:
+            return f"{obj.employee.first_name} {obj.employee.last_name}"
+        return "Sin empleado"
 
 class CheckSerializer(TenantAwareSerializer):
     class Meta(TenantAwareSerializer.Meta):
