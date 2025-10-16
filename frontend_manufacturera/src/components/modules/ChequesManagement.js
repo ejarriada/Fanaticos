@@ -8,36 +8,70 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import ChequeDialog from '../common/ChequeDialog';
-import { normalizeChequeFromBackend, normalizeChequeToBackend } from '../../utils/chequeTransformers'; // Importar desde el nuevo archivo
+import { normalizeChequeFromBackend, normalizeChequeToBackend } from '../../utils/chequeTransformers';
 
 const ChequesManagement = () => {
     const [cheques, setCheques] = useState([]);
-    const [banks, setBanks] = useState([]); // Estado para los bancos
+    const [banks, setBanks] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadingBanks, setLoadingBanks] = useState(true);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedCheque, setSelectedCheque] = useState(null);
     const { tenantId } = useAuth();
 
-    const fetchData = async () => {
+    const fetchBanks = async () => {
         try {
-            setLoading(true);
-            const [chequesResponse, banksResponse] = await Promise.all([
-                api.list('/checks/'),
-                api.list('/banks/')
-            ]);
-
-            const chequeList = Array.isArray(chequesResponse.results) ? chequesResponse.results : [];
-            setCheques(chequeList.map(normalizeChequeFromBackend));
-
-            const banksList = Array.isArray(banksResponse.results) ? banksResponse.results : [];
+            console.log('🏦 Cargando bancos...');
+            setLoadingBanks(true);
+            const banksResponse = await api.list('/banks/');
+            
+            // Manejo flexible de la respuesta
+            let banksList = [];
+            if (Array.isArray(banksResponse)) {
+                banksList = banksResponse;
+            } else if (banksResponse?.results && Array.isArray(banksResponse.results)) {
+                banksList = banksResponse.results;
+            } else if (banksResponse?.data && Array.isArray(banksResponse.data)) {
+                banksList = banksResponse.data;
+            }
+            
+            console.log('✅ Bancos cargados:', banksList);
             setBanks(banksList);
+        } catch (err) {
+            console.error('❌ Error al cargar bancos:', err);
+            setError('Error al cargar los bancos.');
+        } finally {
+            setLoadingBanks(false);
+        }
+    };
 
+    const fetchCheques = async () => {
+        try {
+            console.log('💳 Cargando cheques...');
+            setLoading(true);
+            const chequesResponse = await api.list('/checks/');
+            
+            // Manejo flexible de la respuesta
+            let chequeList = [];
+            if (Array.isArray(chequesResponse)) {
+                chequeList = chequesResponse;
+            } else if (chequesResponse?.results && Array.isArray(chequesResponse.results)) {
+                chequeList = chequesResponse.results;
+            } else if (chequesResponse?.data && Array.isArray(chequesResponse.data)) {
+                chequeList = chequesResponse.data;
+            }
+
+            console.log('✅ Cheques cargados (raw):', chequeList);
+            const normalizedCheques = chequeList.map(normalizeChequeFromBackend);
+            console.log('✅ Cheques normalizados:', normalizedCheques);
+            
+            setCheques(normalizedCheques);
             setError(null);
         } catch (err) {
-            setError('Error al cargar los datos. Por favor, intente de nuevo.');
-            console.error('Error fetching data:', err);
+            setError('Error al cargar los cheques. Por favor, intente de nuevo.');
+            console.error('❌ Error fetching cheques:', err);
         } finally {
             setLoading(false);
         }
@@ -45,38 +79,29 @@ const ChequesManagement = () => {
 
     useEffect(() => {
         if (tenantId) {
-            fetchData();
+            fetchBanks();
+            fetchCheques();
         }
     }, [tenantId]);
 
     const getBankName = (bankId) => {
-        console.log("getBankName - bankId:", bankId, "banks:", banks);
-        if (!banks.length) return bankId; // Devuelve ID si los bancos no se han cargado
-        const bank = banks.find(b => b.id === bankId);
-        return bank ? bank.name : bankId; // Devuelve ID si no se encuentra el banco
+        if (!bankId) return '-';
+        if (!banks || banks.length === 0) {
+            console.warn('⚠️ Bancos aún no cargados');
+            return `ID: ${bankId}`;
+        }
+        
+        const bank = banks.find(b => b.id === parseInt(bankId));
+        return bank ? bank.name : `ID: ${bankId}`;
     };
 
     const handleOpenForm = (cheque = null) => {
         if (cheque) {
             console.log('📝 Editando cheque:', cheque);
+            console.log('🏦 Bancos disponibles:', banks);
             
-            // Normalizar el objeto cheque para asegurar compatibilidad
-            const normalizedCheque = {
-                id: cheque.id,
-                number: cheque.number || '',
-                amount: cheque.amount || '',
-                bank: typeof cheque.bank === 'object' ? cheque.bank?.id : cheque.bank,
-                issuer: cheque.issuer || '',
-                cuit: cheque.cuit || '',
-                due_date: cheque.due_date || '',
-                recipient: cheque.recipient || '',
-                received_from: cheque.received_from || '',
-                observations: cheque.observations || '',
-                status: cheque.status || 'CARGADO'
-            };
-            
-            console.log('📝 Cheque normalizado:', normalizedCheque);
-            setSelectedCheque(normalizedCheque);
+            // El cheque ya viene normalizado desde fetchCheques
+            setSelectedCheque(cheque);
         } else {
             console.log('➕ Nuevo cheque');
             setSelectedCheque(null);
@@ -92,22 +117,27 @@ const ChequesManagement = () => {
 
     const handleSave = async (chequeData) => {
         try {
+            console.log('💾 Guardando cheque (frontend):', chequeData);
             const dataToSend = normalizeChequeToBackend(chequeData);
+            console.log('📤 Datos a enviar (backend format):', dataToSend);
 
             if (selectedCheque && selectedCheque.id) {
                 await api.update('/checks/', selectedCheque.id, dataToSend);
+                setSuccessMessage('Cheque actualizado exitosamente');
             } else {
                 await api.create('/checks/', dataToSend);
+                setSuccessMessage('Cheque creado exitosamente');
             }
-            fetchData(); // La lista se normalizará al obtenerla
+            
+            await fetchCheques();
             handleCloseForm();
         } catch (err) {
+            console.error('❌ Error al guardar:', err);
             const errorData = err.response?.data;
             const errorMessage = errorData 
                 ? Object.entries(errorData).map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`).join('; ')
                 : 'Error al guardar el cheque.';
             setError(errorMessage);
-            console.error(err);
         }
     };
 
@@ -117,9 +147,9 @@ const ChequesManagement = () => {
                 console.log('🗑️ Eliminando cheque ID:', id);
                 await api.remove('/checks/', id);
                 setSuccessMessage('Cheque eliminado exitosamente');
-                await fetchData();
+                await fetchCheques();
             } catch (err) {
-                console.error('❌ Error al eliminar cheque:', err);
+                console.error('❌ Error al eliminar:', err);
                 setError('Error al eliminar el cheque.');
             }
         }
@@ -139,6 +169,14 @@ const ChequesManagement = () => {
         return date.toLocaleDateString('es-AR');
     };
 
+    if (loading || loadingBanks) {
+        return (
+            <Box sx={{ p: 3, display: 'flex', justifyContent: 'center' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
     return (
         <Box sx={{ p: 3 }}>
             <Typography variant="h4" gutterBottom>Gestión de Cheques</Typography>
@@ -151,94 +189,91 @@ const ChequesManagement = () => {
                 Nuevo Cheque
             </Button>
 
-            {loading && <CircularProgress />}
             {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
 
-            {!loading && (
-                <TableContainer component={Paper}>
-                    <Table>
-                        <TableHead>
+            <TableContainer component={Paper}>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell><strong>Número</strong></TableCell>
+                            <TableCell><strong>Monto</strong></TableCell>
+                            <TableCell><strong>Banco</strong></TableCell>
+                            <TableCell><strong>Emisor</strong></TableCell>
+                            <TableCell><strong>Vencimiento</strong></TableCell>
+                            <TableCell><strong>Estado</strong></TableCell>
+                            <TableCell><strong>Acciones</strong></TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {cheques.length === 0 ? (
                             <TableRow>
-                                <TableCell><strong>Número</strong></TableCell>
-                                <TableCell><strong>Monto</strong></TableCell>
-                                <TableCell><strong>Banco</strong></TableCell>
-                                <TableCell><strong>Emisor</strong></TableCell>
-                                <TableCell><strong>Vencimiento</strong></TableCell>
-                                <TableCell><strong>Estado</strong></TableCell>
-                                <TableCell><strong>Acciones</strong></TableCell>
+                                <TableCell colSpan={7} align="center">
+                                    <Typography color="text.secondary">
+                                        No hay cheques registrados
+                                    </Typography>
+                                </TableCell>
                             </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {cheques.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={7} align="center">
-                                        <Typography color="text.secondary">
-                                            No hay cheques registrados
-                                        </Typography>
+                        ) : (
+                            cheques.map((cheque) => (
+                                <TableRow key={cheque.id} hover>
+                                    <TableCell>{cheque.number}</TableCell>
+                                    <TableCell>{formatCurrency(cheque.amount)}</TableCell>
+                                    <TableCell>{getBankName(cheque.bank)}</TableCell>
+                                    <TableCell>{cheque.issuer || '-'}</TableCell>
+                                    <TableCell>{formatDate(cheque.due_date)}</TableCell>
+                                    <TableCell>
+                                        <Box
+                                            sx={{
+                                                px: 1,
+                                                py: 0.5,
+                                                borderRadius: 1,
+                                                display: 'inline-block',
+                                                backgroundColor: 
+                                                    cheque.status === 'CARGADO' ? '#fff3e0' :
+                                                    cheque.status === 'ENTREGADO' ? '#e8f5e9' :
+                                                    cheque.status === 'COBRADO' ? '#e3f2fd' :
+                                                    cheque.status === 'RECHAZADO' ? '#ffebee' :
+                                                    '#f5f5f5',
+                                                color:
+                                                    cheque.status === 'CARGADO' ? '#e65100' :
+                                                    cheque.status === 'ENTREGADO' ? '#2e7d32' :
+                                                    cheque.status === 'COBRADO' ? '#1565c0' :
+                                                    cheque.status === 'RECHAZADO' ? '#c62828' :
+                                                    '#616161'
+                                            }}
+                                        >
+                                            {cheque.status}
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell>
+                                        <IconButton 
+                                            onClick={() => handleOpenForm(cheque)}
+                                            color="primary"
+                                            size="small"
+                                        >
+                                            <EditIcon />
+                                        </IconButton>
+                                        <IconButton 
+                                            onClick={() => handleDelete(cheque.id)}
+                                            color="error"
+                                            size="small"
+                                        >
+                                            <DeleteIcon />
+                                        </IconButton>
                                     </TableCell>
                                 </TableRow>
-                            ) : (
-                                cheques.map((cheque) => (
-                                    <TableRow key={cheque.id} hover>
-                                        <TableCell>{cheque.number}</TableCell>
-                                        <TableCell>{formatCurrency(cheque.amount)}</TableCell>
-                                        <TableCell>{getBankName(cheque.bank)}</TableCell>
-                                        <TableCell>{cheque.issuer || '-'}</TableCell>
-                                        <TableCell>{formatDate(cheque.due_date)}</TableCell>
-                                        <TableCell>
-                                            <Box
-                                                sx={{
-                                                    px: 1,
-                                                    py: 0.5,
-                                                    borderRadius: 1,
-                                                    display: 'inline-block',
-                                                    backgroundColor: 
-                                                        cheque.status === 'CARGADO' ? '#fff3e0' :
-                                                        cheque.status === 'ENTREGADO' ? '#e8f5e9' :
-                                                        cheque.status === 'COBRADO' ? '#e3f2fd' :
-                                                        cheque.status === 'RECHAZADO' ? '#ffebee' :
-                                                        '#f5f5f5',
-                                                    color:
-                                                        cheque.status === 'CARGADO' ? '#e65100' :
-                                                        cheque.status === 'ENTREGADO' ? '#2e7d32' :
-                                                        cheque.status === 'COBRADO' ? '#1565c0' :
-                                                        cheque.status === 'RECHAZADO' ? '#c62828' :
-                                                        '#616161'
-                                                }}
-                                            >
-                                                {cheque.status}
-                                            </Box>
-                                        </TableCell>
-                                        <TableCell>
-                                            <IconButton 
-                                                onClick={() => handleOpenForm(cheque)}
-                                                color="primary"
-                                                size="small"
-                                            >
-                                                <EditIcon />
-                                            </IconButton>
-                                            <IconButton 
-                                                onClick={() => handleDelete(cheque.id)}
-                                                color="error"
-                                                size="small"
-                                            >
-                                                <DeleteIcon />
-                                            </IconButton>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            )}
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </TableContainer>
 
             <ChequeDialog 
                 open={isFormOpen} 
                 onClose={handleCloseForm} 
                 onSave={handleSave} 
                 cheque={selectedCheque} 
-                banks={banks} // Pasar la lista de bancos
+                banks={banks}
             />
 
             <Snackbar
