@@ -38,9 +38,13 @@ import PermitManagement from './components/modules/PermitManagement';
 import MedicalRecordManagement from './components/modules/MedicalRecordManagement';
 import UserManagement from './components/modules/UserManagement';
 import ReportsModule from './components/reports/ReportsModule';
-
-
-import DeliveryNoteManagement from './components/modules/DeliveryNoteManagement';
+import CommercialProductManagement from './components/modules/CommercialProductManagement';
+import ProductReservationManagement from './components/modules/ProductReservationManagement';
+import ProductReservationManagement from './components/modules/ProductReservationManagement';
+import PromotionManagement from './components/modules/PromotionManagement';
+import LoyaltyCardManagement from './components/modules/LoyaltyCardManagement';
+import EcommerceSaleManagement from './components/modules/EcommerceSaleManagement';
+import InternalDeliveryNoteManagement from './components/modules/InternalDeliveryNoteManagement';
 
 const drawerWidth = 240;
 
@@ -130,10 +134,14 @@ function App() {
             <Route path="/accounting-finance" element={<PrivateRoute><AccountingFinanceModule /></PrivateRoute>} />
             
             <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
+            <Route path="/commercial-products" element={<PrivateRoute><CommercialProductManagement /></PrivateRoute>} />
+            <Route path="/product-reservations" element={<PrivateRoute><ProductReservationManagement /></PrivateRoute>} />
+            <Route path="/product-reservations" element={<PrivateRoute><ProductReservationManagement /></PrivateRoute>} />
+            <Route path="/promotions" element={<PrivateRoute><PromotionManagement /></PrivateRoute>} />
+            <Route path="/loyalty-cards" element={<PrivateRoute><LoyaltyCardManagement /></PrivateRoute>} />
+            <Route path="/ecommerce-sales" element={<PrivateRoute><EcommerceSaleManagement /></PrivateRoute>} />
 
-            
-
-            
+                        
           </Routes>
         </Router>
       </ThemeProvider>

@@ -35,6 +35,7 @@ ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,back
 INSTALLED_APPS = [
     'corsheaders', # CORS headers
     'core', # Our custom app
+    'comercializadora', # App for commercial-side logic
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

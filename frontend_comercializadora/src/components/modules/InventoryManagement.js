@@ -70,7 +70,7 @@ const ProductForm = ({ open, onClose, onSave, product }) => {
     );
 };
 
-// Inventory Form Dialog Component
+import CommercialInventoryForm from './CommercialInventoryForm';
 const InventoryForm = ({ open, onClose, onSave, inventory }) => {
     const [formData, setFormData] = useState({});
     const [products, setProducts] = useState([]);
@@ -84,7 +84,7 @@ const InventoryForm = ({ open, onClose, onSave, inventory }) => {
             try {
                 setLoadingDependencies(true);
                 const [productsData, localsData] = await Promise.all([
-                    api.list('/products/'),
+                    api.list('commercial/commercial-products/'),
                     api.list('/locals/'),
                 ]);
                 setProducts(Array.isArray(productsData) ? productsData : productsData.results || []);
@@ -243,7 +243,7 @@ const InventoryManagement = () => {
     const fetchInventories = async () => {
         try {
             setLoadingInventory(true);
-            const data = await api.list('/inventories/');
+            const data = await api.list('commercial/commercial-inventories/');
             const inventoryList = Array.isArray(data) ? data : data.results;
             setInventories(inventoryList || []);
             setInventoryError(null);
@@ -305,9 +305,9 @@ const InventoryManagement = () => {
             };
 
             if (selectedInventory) {
-                await api.update('/inventories/', selectedInventory.id, dataToSend);
+                await api.update('commercial/commercial-inventories/', selectedInventory.id, dataToSend);
             } else {
-                await api.create('/inventories/', dataToSend);
+                await api.create('commercial/commercial-inventories/', dataToSend);
             }
             fetchInventories(); // Refresh list
             handleCloseInventoryForm();
@@ -324,7 +324,7 @@ const InventoryManagement = () => {
     const handleDeleteInventory = async (id) => {
         if (window.confirm('¿Está seguro de que desea eliminar este elemento del inventario?')) {
             try {
-                await api.remove('/inventories/', id);
+                await api.remove('commercial/commercial-inventories/', id);
                 fetchInventories(); // Refresh list
             } catch (err) {
                 setInventoryError('Error al eliminar el inventario.');
@@ -337,7 +337,7 @@ const InventoryManagement = () => {
     const fetchProducts = async () => {
         try {
             setLoadingProducts(true);
-            const data = await api.list('/products/');
+            const data = await api.list('commercial/commercial-products/');
             const productList = Array.isArray(data) ? data : data.results;
             setProducts(productList || []);
             setProductError(null);
@@ -368,9 +368,9 @@ const InventoryManagement = () => {
     const handleSaveProduct = async (productData) => {
         try {
             if (selectedProduct) {
-                await api.update('/products/', selectedProduct.id, productData);
+                await api.update('commercial/commercial-products/', selectedProduct.id, productData);
             } else {
-                await api.create('/products/', productData);
+                await api.create('commercial/commercial-products/', productData);
             }
             fetchProducts(); // Refresh list
             handleCloseProductForm();
@@ -387,7 +387,7 @@ const InventoryManagement = () => {
     const handleDeleteProduct = async (id) => {
         if (window.confirm('¿Está seguro de que desea eliminar este producto?')) {
             try {
-                await api.remove('/products/', id);
+                await api.remove('commercial/commercial-products/', id);
                 fetchProducts(); // Refresh list
             } catch (err) {
                 setProductError('Error al eliminar el producto.');

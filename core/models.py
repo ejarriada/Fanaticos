@@ -1,7 +1,7 @@
 from django.utils import timezone
 from django.db import models
 from django.core.validators import FileExtensionValidator
-from django.db.models import JSONField
+from django.db.models import JSONField, Q, CheckConstraint
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 import datetime
@@ -45,27 +45,14 @@ class RawMaterial(TenantAwareModel):
     def __str__(self):
         return self.name
 
-class Warehouse(models.Model):
-    name = models.CharField(max_length=200)
-    factory = models.ForeignKey('Factory', on_delete=models.CASCADE, related_name='warehouses')
-    tenant = models.ForeignKey('Tenant', on_delete=models.CASCADE)
-    is_default_for_finished_products = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"{self.name} - {self.factory.name}"
-    
-    class Meta:
-        db_table = 'warehouses'
-        ordering = ['name']
+
 
 # --- Location and Financial Models ---
 
 class MateriaPrimaProveedor(TenantAwareModel):
     raw_material = models.ForeignKey(RawMaterial, on_delete=models.CASCADE, related_name="proveedores")
     supplier = models.ForeignKey('Supplier', on_delete=models.SET_NULL, null=True, blank=True, related_name="materias_primas")
-    warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, related_name='raw_materials', null=True, blank=True)
+    warehouse = models.ForeignKey('Warehouse', on_delete=models.PROTECT, related_name='raw_materials', null=True, blank=True)
     supplier_code = models.CharField(max_length=100, blank=True, null=True)
     brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True)
     cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
@@ -315,10 +302,10 @@ class DeliveryNote(TenantAwareModel):
                                        help_text="Venta asociada (opcional)")
     
     # Almacenes (origen y destino)
-    origen = models.ForeignKey(Warehouse, on_delete=models.PROTECT, 
+    origen = models.ForeignKey('Warehouse', on_delete=models.PROTECT, 
                                related_name='remitos_salida',
                                help_text="Almacén de origen", null=True)
-    destino = models.ForeignKey(Warehouse, on_delete=models.SET_NULL, 
+    destino = models.ForeignKey('Warehouse', on_delete=models.SET_NULL, 
                                 null=True, blank=True,
                                 related_name='remitos_entrada',
                                 help_text="Almacén de destino (para remitos internos)")
@@ -342,11 +329,23 @@ class DeliveryNote(TenantAwareModel):
 
 class DeliveryNoteItem(TenantAwareModel):
     delivery_note = models.ForeignKey(DeliveryNote, on_delete=models.CASCADE, related_name='items')
-    product = models.ForeignKey(Product, on_delete=models.CASCADE) # Uncommented
-    quantity = models.IntegerField()
+    quantity = models.PositiveIntegerField()
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True)
+    commercial_product = models.ForeignKey('comercializadora.CommercialProduct', on_delete=models.CASCADE, null=True, blank=True)
 
-    def __str__(self):
-        return f"{self.quantity} x {self.product.name} en Remito #{self.delivery_note.id}"
+    class Meta:
+        constraints = [
+            CheckConstraint(
+                check=Q(product__isnull=False, commercial_product__isnull=True) | Q(product__isnull=True, commercial_product__isnull=False),
+                name='core_deliverynoteitem_uno_solo_producto'
+            )
+        ]
+
+    def clean(self):
+        if self.product and self.commercial_product:
+            raise ValidationError('El ítem solo puede referenciar a un Producto o a un CommercialProduct, no a ambos.')
+        if not self.product and not self.commercial_product:
+            raise ValidationError('El ítem debe referenciar a un Producto o a un CommercialProduct.')
 
 
 # --- Production Flow Models ---
@@ -547,14 +546,38 @@ class Local(TenantAwareModel):
     def __str__(self):
         return f"{self.name} ({self.tenant.name})"
 
+class Warehouse(TenantAwareModel):
+    WAREHOUSE_TYPES = [
+        ('central', 'Almacén Central'),
+        ('local_storage', 'Almacén de Local'),
+        ('local_exhibition', 'Exhibición de Local'),
+    ]
+    name = models.CharField(max_length=200)
+    type = models.CharField(max_length=20, choices=WAREHOUSE_TYPES, default='central')
+    local = models.ForeignKey(Local, on_delete=models.CASCADE, related_name='warehouses', null=True, blank=True, help_text="Local al que pertenece (si no es central)")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        if self.type != 'central' and not self.local:
+            raise ValidationError('Un almacén de tipo local debe estar asociado a un local.')
+        if self.type == 'central' and self.local:
+            raise ValidationError('Un almacén central no puede estar asociado a un local.')
+
+    def __str__(self):
+        if self.local:
+            return f"{self.name} ({self.local.name})"
+        return f"{self.name} (Central)"
+
 class Inventory(TenantAwareModel):
     product = models.ForeignKey(Product, on_delete=models.CASCADE) # Uncommented
-    warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, related_name='finished_products', null=True, blank=True)
+    warehouse = models.ForeignKey('Warehouse', on_delete=models.PROTECT, related_name='finished_products', null=True, blank=True)
     quantity = models.IntegerField()
 
     class Meta:
         unique_together = ('product', 'warehouse', 'tenant')
- 
+
     def __str__(self):
         return f"{self.product.name} en {self.local.name}: {self.quantity}"
 

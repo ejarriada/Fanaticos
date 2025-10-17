@@ -11,10 +11,10 @@ import AddIcon from '@mui/icons-material/Add';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 
-const DeliveryNoteForm = ({ open, onClose, onSave, deliveryNote }) => {
-    const [formData, setFormData] = useState({ sale: '', items: [] });
-    const [sales, setSales] = useState([]);
-    const [products, setProducts] = useState([]);
+const InternalDeliveryNoteForm = ({ open, onClose, onSave, deliveryNote }) => {
+    const [formData, setFormData] = useState({ origin_warehouse: '', destination_warehouse: '', items: [] });
+    const [commercialProducts, setCommercialProducts] = useState([]);
+    const [warehouses, setWarehouses] = useState([]);
     const [loadingDependencies, setLoadingDependencies] = useState(true);
     const { tenantId } = useAuth();
 
@@ -22,12 +22,12 @@ const DeliveryNoteForm = ({ open, onClose, onSave, deliveryNote }) => {
         const fetchDependencies = async () => {
             try {
                 setLoadingDependencies(true);
-                const [salesData, productsData] = await Promise.all([
-                    api.list('/sales/'),
-                    api.list('/products/'),
+                const [commercialProductsData, warehousesData] = await Promise.all([
+                    api.list('commercial/commercial-products/'),
+                    api.list('/warehouses/'),
                 ]);
-                setSales(Array.isArray(salesData) ? salesData : salesData.results || []);
-                setProducts(Array.isArray(productsData) ? productsData : productsData.results || []);
+                setCommercialProducts(Array.isArray(commercialProductsData) ? commercialProductsData : commercialProductsData.results || []);
+                setWarehouses(Array.isArray(warehousesData) ? warehousesData : warehousesData.results || []);
             } catch (err) {
                 console.error('Error fetching dependencies', err);
             } finally {
@@ -42,11 +42,15 @@ const DeliveryNoteForm = ({ open, onClose, onSave, deliveryNote }) => {
     useEffect(() => {
         if (deliveryNote) {
             setFormData({
-                sale: deliveryNote.sale || '',
-                items: deliveryNote.items || [],
+                origin_warehouse: deliveryNote.origin_warehouse || '',
+                destination_warehouse: deliveryNote.destination_warehouse || '',
+                items: deliveryNote.items.map(item => ({
+                    commercial_product: item.commercial_product || '',
+                    quantity: item.quantity || 1,
+                })) || [],
             });
         } else {
-            setFormData({ sale: '', items: [] });
+            setFormData({ origin_warehouse: '', destination_warehouse: '', items: [] });
         }
     }, [deliveryNote, open]);
 
@@ -73,23 +77,42 @@ const DeliveryNoteForm = ({ open, onClose, onSave, deliveryNote }) => {
     const handleSubmit = () => {
         const submissionData = {
             ...formData,
-            sale: formData.sale || null, // Send sale ID or null
+            origin_warehouse: formData.origin_warehouse || null,
+            destination_warehouse: formData.destination_warehouse || null,
+            items: formData.items.map(item => ({
+                commercial_product: item.commercial_product,
+                quantity: item.quantity,
+            })),
         };
         onSave(submissionData);
     };
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-            <DialogTitle>{deliveryNote ? 'Editar Remito' : 'Nuevo Remito'}</DialogTitle>
+            <DialogTitle>{deliveryNote ? 'Editar Remito Interno' : 'Nuevo Remito Interno'}</DialogTitle>
             <DialogContent>
-                <FormControl fullWidth margin="dense">
-                    <InputLabel>Venta</InputLabel>
-                    <Select name="sale" value={formData.sale} onChange={handleFormChange} label="Venta">
-                        {sales.map(sale => (
-                            <MenuItem key={sale.id} value={sale.id}>{`Venta #${sale.id} - ${new Date(sale.sale_date).toLocaleDateString()}`}</MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
+                <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth margin="dense">
+                            <InputLabel>Almacén de Origen</InputLabel>
+                            <Select name="origin_warehouse" value={formData.origin_warehouse} onChange={handleFormChange} label="Almacén de Origen">
+                                {warehouses.map(warehouse => (
+                                    <MenuItem key={warehouse.id} value={warehouse.id}>{warehouse.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth margin="dense">
+                            <InputLabel>Almacén de Destino</InputLabel>
+                            <Select name="destination_warehouse" value={formData.destination_warehouse} onChange={handleFormChange} label="Almacén de Destino">
+                                {warehouses.map(warehouse => (
+                                    <MenuItem key={warehouse.id} value={warehouse.id}>{warehouse.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                </Grid>
 
                 <Typography sx={{ mt: 2, mb: 1 }}>Items</Typography>
                 <Stack spacing={2}>
@@ -97,9 +120,9 @@ const DeliveryNoteForm = ({ open, onClose, onSave, deliveryNote }) => {
                         <Grid container spacing={2} key={index} alignItems="center">
                             <Grid item xs={5}>
                                 <FormControl fullWidth>
-                                    <InputLabel>Producto</InputLabel>
-                                    <Select value={item.product} onChange={(e) => handleItemChange(index, 'product', e.target.value)} label="Producto">
-                                        {products.map(product => <MenuItem key={product.id} value={product.id}>{product.name}</MenuItem>)}
+                                    <InputLabel>Producto Comercial</InputLabel>
+                                    <Select value={item.commercial_product} onChange={(e) => handleItemChange(index, 'commercial_product', e.target.value)} label="Producto Comercial">
+                                        {commercialProducts.map(product => <MenuItem key={product.id} value={product.id}>{product.name}</MenuItem>)}
                                     </Select>
                                 </FormControl>
                             </Grid>
@@ -122,7 +145,7 @@ const DeliveryNoteForm = ({ open, onClose, onSave, deliveryNote }) => {
     );
 };
 
-const DeliveryNoteManagement = () => {
+const InternalDeliveryNoteManagement = () => {
     const { tenantId } = useAuth();
     const [deliveryNotes, setDeliveryNotes] = useState([]);
     const [sales, setSales] = useState([]);
@@ -134,14 +157,9 @@ const DeliveryNoteManagement = () => {
     const fetchDeliveryNotes = async () => {
         try {
             setLoading(true);
-            const [deliveryNotesData, salesData] = await Promise.all([
-                api.list('/delivery-notes/'),
-                api.list('/sales/'),
-            ]);
+            const deliveryNotesData = await api.list('commercial/internal-delivery-notes/');
             const deliveryNoteList = Array.isArray(deliveryNotesData) ? deliveryNotesData : deliveryNotesData.results;
-            const salesList = Array.isArray(salesData) ? salesData : salesData.results;
             setDeliveryNotes(deliveryNoteList || []);
-            setSales(salesList || []);
             setError(null);
         } catch (err) {
             setError('Error al cargar los remitos. Por favor, intente de nuevo.');
@@ -170,9 +188,9 @@ const DeliveryNoteManagement = () => {
     const handleSave = async (deliveryNoteData) => {
         try {
             if (selectedDeliveryNote) {
-                await api.update('/delivery-notes/', selectedDeliveryNote.id, deliveryNoteData);
+                await api.update('commercial/internal-delivery-notes/', selectedDeliveryNote.id, deliveryNoteData);
             } else {
-                await api.create('/delivery-notes/', deliveryNoteData);
+                await api.create('commercial/internal-delivery-notes/', deliveryNoteData);
             }
             fetchDeliveryNotes();
             handleCloseForm();
@@ -189,7 +207,7 @@ const DeliveryNoteManagement = () => {
     const handleDelete = async (id) => {
         if (window.confirm('¿Está seguro de que desea eliminar este remito?')) {
             try {
-                await api.remove('/delivery-notes/', id);
+                await api.remove('commercial/internal-delivery-notes/', id);
                 fetchDeliveryNotes();
             } catch (err) {
                 setError('Error al eliminar el remito.');
@@ -198,16 +216,11 @@ const DeliveryNoteManagement = () => {
         }
     };
 
-    const getSaleInfo = (saleId) => {
-        const sale = sales.find(s => s.id === saleId);
-        return sale ? `Venta #${sale.id} - ${new Date(sale.sale_date).toLocaleDateString()}` : 'Desconocido';
-    };
-
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h4" gutterBottom>Gestión de Remitos</Typography>
+            <Typography variant="h4" gutterBottom>Gestión de Remitos Internos</Typography>
             <Button variant="contained" onClick={() => handleOpenForm()} sx={{ mb: 2 }} startIcon={<AddIcon />}>
-                Nuevo Remito
+                Nuevo Remito Interno
             </Button>
 
             {loading && <CircularProgress />}
@@ -219,9 +232,10 @@ const DeliveryNoteManagement = () => {
                         <TableHead>
                             <TableRow>
                                 <TableCell>ID</TableCell>
-                                <TableCell>Venta</TableCell>
-                                <TableCell>Fecha</TableCell>
+                                <TableCell>Almacén de Origen</TableCell>
+                                <TableCell>Almacén de Destino</TableCell>
                                 <TableCell>Estado</TableCell>
+                                <TableCell>Fecha de Creación</TableCell>
                                 <TableCell>Acciones</TableCell>
                             </TableRow>
                         </TableHead>
@@ -229,9 +243,10 @@ const DeliveryNoteManagement = () => {
                             {deliveryNotes.map((deliveryNote) => (
                                 <TableRow key={deliveryNote.id}>
                                     <TableCell>{deliveryNote.id}</TableCell>
-                                    <TableCell>{getSaleInfo(deliveryNote.sale)}</TableCell>
-                                    <TableCell>{new Date(deliveryNote.date).toLocaleDateString()}</TableCell>
+                                    <TableCell>{deliveryNote.origin_warehouse}</TableCell>
+                                    <TableCell>{deliveryNote.destination_warehouse}</TableCell>
                                     <TableCell>{deliveryNote.status}</TableCell>
+                                    <TableCell>{new Date(deliveryNote.created_at).toLocaleDateString()}</TableCell>
                                     <TableCell>
                                         <IconButton onClick={() => handleOpenForm(deliveryNote)}><EditIcon /></IconButton>
                                         <IconButton onClick={() => handleDelete(deliveryNote.id)}><DeleteIcon /></IconButton>
@@ -243,7 +258,7 @@ const DeliveryNoteManagement = () => {
                 </TableContainer>
             )}
 
-            <DeliveryNoteForm
+            <InternalDeliveryNoteForm
                 open={isFormOpen}
                 onClose={handleCloseForm}
                 onSave={handleSave}
@@ -253,4 +268,4 @@ const DeliveryNoteManagement = () => {
     );
 };
 
-export default DeliveryNoteManagement;
+export default InternalDeliveryNoteManagement;

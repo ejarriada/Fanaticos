@@ -228,7 +228,7 @@ class ProductionOrderViewSet(TenantAwareViewSet):
         for item in production_order.items.all():
             inventory_item, created = Inventory.objects.get_or_create(
                 product=item.product,
-                local=factory_local,
+                warehouse=Warehouse.objects.get(name='Fábrica', tenant=production_order.tenant),
                 tenant=production_order.tenant
             )
             inventory_item.quantity += item.quantity
@@ -995,8 +995,6 @@ class DeliveryNoteViewSet(TenantAwareViewSet):
     serializer_class = DeliveryNoteSerializer
 
     def perform_create(self, serializer):
-        with transaction.atomic():
-            # Get the origin warehouse from the validated data. This is where stock will be deducted from.
             origen_warehouse = serializer.validated_data.get('origen')
             if not origen_warehouse:
                 raise serializers.ValidationError({"origen": "Se requiere un almacén de origen."})
@@ -1043,7 +1041,6 @@ class DeliveryNoteViewSet(TenantAwareViewSet):
                 )
                 inventory_item.quantity -= item.quantity
                 inventory_item.save()
-
 
 # Non-tenant-aware or special case ViewSets
 class TenantViewSet(viewsets.ModelViewSet):

@@ -9,147 +9,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import * as api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 
-// Employee Form Dialog Component
-const EmployeeForm = ({ open, onClose, onSave, employee }) => {
-    const [formData, setFormData] = useState({});
-    const [users, setUsers] = useState([]);
-    const [locals, setLocals] = useState([]); // Changed from factories
-    const [employeeRoles, setEmployeeRoles] = useState([]);
-    const [loadingDependencies, setLoadingDependencies] = useState(true);
-    const [dependenciesError, setDependenciesError] = useState(null);
-    const { tenantId } = useAuth();
-
-    useEffect(() => {
-        const fetchDependencies = async () => {
-            try {
-                setLoadingDependencies(true);
-                const [usersData, localsData, employeeRolesData] = await Promise.all([
-                    api.list('/users/'),
-                    api.list('/locals/'), // Changed from factories
-                    api.list('/employee-roles/'),
-                ]);
-                setUsers(Array.isArray(usersData) ? usersData : usersData.results || []);
-                setLocals(Array.isArray(localsData) ? localsData : localsData.results || []); // Changed from factories
-                setEmployeeRoles(Array.isArray(employeeRolesData) ? employeeRolesData : employeeRolesData.results || []);
-            } catch (err) {
-                setDependenciesError('Error al cargar dependencias (usuarios, locales, roles).'); // Updated error message
-                console.error(err);
-            } finally {
-                setLoadingDependencies(false);
-            }
-        };
-
-        if (tenantId) {
-            fetchDependencies();
-        }
-    }, [tenantId]);
-
-    useEffect(() => {
-        if (employee) {
-            setFormData({
-                ...employee,
-                hire_date: employee.hire_date ? new Date(employee.hire_date).toISOString().split('T')[0] : '',
-                user: employee.user?.id || '',
-                local: employee.local?.id || '',
-                role: employee.role?.id || '',
-            });
-        } else {
-            setFormData({
-                user: '',
-                local: '',
-                role: '',
-                hire_date: new Date().toISOString().split('T')[0],
-            });
-        }
-    }, [employee, open]);
-
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-    const handleSubmit = () => {
-        onSave(formData);
-    };
-
-    if (loadingDependencies) {
-        return (
-            <Dialog open={open} onClose={onClose}>
-                <DialogTitle>Cargando dependencias...</DialogTitle>
-                <DialogContent><CircularProgress /></DialogContent>
-            </Dialog>
-        );
-    }
-
-    if (dependenciesError) {
-        return (
-            <Dialog open={open} onClose={onClose}>
-                <DialogTitle>Error</DialogTitle>
-                <DialogContent><Alert severity="error">{dependenciesError}</Alert></DialogContent>
-            </Dialog>
-        );
-    }
-
-    return (
-        <Dialog open={open} onClose={onClose}>
-            <DialogTitle>{employee ? 'Editar Empleado' : 'Nuevo Empleado'}</DialogTitle>
-            <DialogContent>
-                <TextField
-                    margin="dense"
-                    name="user"
-                    label="Usuario"
-                    select
-                    fullWidth
-                    value={formData.user || ''}
-                    onChange={handleChange}
-                >
-                    {users.map((user) => (
-                        <MenuItem key={user.id} value={user.id}>
-                            {user.email}
-                        </MenuItem>
-                    ))}
-                </TextField>
-
-                <TextField
-                    margin="dense"
-                    name="local"
-                    label="Local"
-                    select
-                    fullWidth
-                    value={formData.local || ''}
-                    onChange={handleChange}
-                >
-                    {locals.map((local) => (
-                        <MenuItem key={local.id} value={local.id}>
-                            {local.name}
-                        </MenuItem>
-                    ))}
-                </TextField>
-
-                <TextField
-                    margin="dense"
-                    name="role"
-                    label="Rol de Empleado"
-                    select
-                    fullWidth
-                    value={formData.role || ''}
-                    onChange={handleChange}
-                >
-                    {employeeRoles.map((role) => (
-                        <MenuItem key={role.id} value={role.id}>
-                            {role.name}
-                        </MenuItem>
-                    ))}
-                </TextField>
-
-                <TextField margin="dense" name="hire_date" label="Fecha de Contratación" type="date" fullWidth value={formData.hire_date || ''} onChange={handleChange} InputLabelProps={{ shrink: true }} />
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose}>Cancelar</Button>
-                <Button onClick={handleSubmit}>Guardar</Button>
-            </DialogActions>
-        </Dialog>
-    );
-};
+import CommercialEmployeeForm from './CommercialEmployeeForm';
 
 // Main Employee Management Component
 const EmployeeManagement = () => {
@@ -163,7 +23,7 @@ const EmployeeManagement = () => {
     const fetchEmployees = async () => {
         try {
             setLoading(true);
-            const data = await api.list('/employees/');
+            const data = await api.list('commercial/commercial-employees/');
             const employeeList = Array.isArray(data) ? data : data.results;
             setEmployees(employeeList || []);
             setError(null);
@@ -201,9 +61,9 @@ const EmployeeManagement = () => {
             };
 
             if (selectedEmployee) {
-                await api.update('/employees/', selectedEmployee.id, dataToSend);
+                await api.update('commercial/commercial-employees/', selectedEmployee.id, dataToSend);
             } else {
-                await api.create('/employees/', dataToSend);
+                await api.create('commercial/commercial-employees/', dataToSend);
             }
             fetchEmployees(); // Refresh list
             handleCloseForm();
@@ -220,7 +80,7 @@ const EmployeeManagement = () => {
     const handleDelete = async (id) => {
         if (window.confirm('¿Está seguro de que desea eliminar este empleado?')) {
             try {
-                await api.remove('/employees/', id);
+                await api.remove('commercial/commercial-employees/', id);
                 fetchEmployees(); // Refresh list
             } catch (err) {
                 setError('Error al eliminar el empleado.');
@@ -231,13 +91,13 @@ const EmployeeManagement = () => {
 
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h4" gutterBottom>Gestión de Empleados</Typography>
+            <Typography variant="h4" gutterBottom>Gestión de Empleados Comerciales</Typography>
             <Button variant="contained" onClick={() => handleOpenForm()} sx={{ mb: 2 }}>
-                Nuevo Empleado
+                Nuevo Empleado Comercial
             </Button>
 
             {loading && <CircularProgress />}
-            {error && <Alert severity="error">{error}</Alert>}
+            {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
 
             {!loading && !error && (
                 <TableContainer component={Paper}>
@@ -245,19 +105,17 @@ const EmployeeManagement = () => {
                         <TableHead>
                             <TableRow>
                                 <TableCell>Usuario</TableCell>
-                                <TableCell>Local</TableCell> {/* Changed from Fábrica */}
+                                <TableCell>Local</TableCell>
                                 <TableCell>Rol</TableCell>
-                                <TableCell>Fecha de Contratación</TableCell>
                                 <TableCell>Acciones</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {employees.map((employee) => (
                                 <TableRow key={employee.id}>
-                                    <TableCell>{employee.user_email || employee.user}</TableCell>
-                                    <TableCell>{employee.local_name || employee.local}</TableCell> {/* Changed from factory_name */}
-                                    <TableCell>{employee.role_name || employee.role}</TableCell>
-                                    <TableCell>{employee.hire_date}</TableCell>
+                                    <TableCell>{employee.user}</TableCell>
+                                    <TableCell>{employee.local}</TableCell>
+                                    <TableCell>{employee.role}</TableCell>
                                     <TableCell>
                                         <IconButton onClick={() => handleOpenForm(employee)}><EditIcon /></IconButton>
                                         <IconButton onClick={() => handleDelete(employee.id)}><DeleteIcon /></IconButton>
@@ -269,7 +127,7 @@ const EmployeeManagement = () => {
                 </TableContainer>
             )}
 
-            <EmployeeForm 
+            <CommercialEmployeeForm 
                 open={isFormOpen} 
                 onClose={handleCloseForm} 
                 onSave={handleSave} 
